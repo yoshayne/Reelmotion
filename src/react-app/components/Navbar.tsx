@@ -3,6 +3,7 @@ import { useUser, useClerk } from "@clerk/clerk-react";
 import { Search, User } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { apiFetch } from "@/react-app/utils/api";
+import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
 
 export default function Navbar() {
   const { user, isSignedIn } = useUser();
@@ -12,6 +13,7 @@ export default function Navbar() {
   const [userRole, setUserRole] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [logoError, setLogoError] = useState(false);
+  const { logo: logoUrl } = useBrandAssets();
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,9 +50,9 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto flex items-center justify-between h-12">
         <div className="flex items-center gap-8">
           <Link to="/browse" className="flex items-center">
-            {!logoError ? (
+            {logoUrl && !logoError ? (
               <img
-                src="https://reelmotionapp.com/api/images/brand-assets/1769360187602-m8s1tb5sryq.png"
+                src={logoUrl}
                 alt="ReelMotion"
                 className="h-8 w-auto"
                 onError={() => setLogoError(true)}

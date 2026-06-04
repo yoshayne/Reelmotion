@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useUser, useClerk } from "@clerk/clerk-react";
 import { apiFetch } from "@/react-app/utils/api";
+import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
 import { Check, Film, Users, Zap, Heart, Crown } from "lucide-react";
 
 export default function SubscribePage() {
   const { user, isLoaded } = useUser();
+  const { logo, tagline } = useBrandAssets();
   const { openSignIn } = useClerk();
   const [selected, setSelected] = useState<"monthly" | "yearly">("yearly");
   const [loading, setLoading] = useState(false);
@@ -49,11 +51,11 @@ export default function SubscribePage() {
         <div className="absolute inset-0" style={{ background: 'linear-gradient(125deg, rgba(232,0,29,0.8) 0%, rgba(139,0,16,0.75) 35%, transparent 35.5%)' }} />
         <div className="absolute top-0 left-0 right-0 px-4" style={{ paddingTop: 'max(env(safe-area-inset-top), 60px)', paddingBottom: '12px' }}>
           <Link to="/browse">
-            <img
-              src="https://reelmotionapp.com/api/images/brand-assets/1769360187602-m8s1tb5sryq.png"
-              alt="ReelMotion"
-              className="h-7 w-auto"
-            />
+            {logo ? (
+              <img src={logo} alt="ReelMotion" className="h-7 w-auto" />
+            ) : (
+              <span className="text-white font-black text-base tracking-tight">REEL<span style={{ color: '#E8001D' }}>MOTION</span></span>
+            )}
           </Link>
         </div>
       </div>
@@ -202,7 +204,7 @@ export default function SubscribePage() {
         <div className="mt-8 flex items-center gap-4">
           <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }} />
           <img
-            src="https://019af3d1-a2f2-7505-8523-8b0f9dcff281.mochausercontent.com/Watch-the-culture-tag.png"
+            src={tagline}
             alt="Watch The Culture"
             className="h-4 object-contain"
             style={{ opacity: 0.4 }}

@@ -1,11 +1,13 @@
 import { useSignIn, useUser } from "@clerk/clerk-react";
 import { useNavigate } from "react-router";
 import { useEffect } from "react";
+import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
 
 export default function Landing() {
   const { isSignedIn } = useUser();
   const { signIn } = useSignIn();
   const navigate = useNavigate();
+  const { logo, tagline } = useBrandAssets();
 
   useEffect(() => {
     if (isSignedIn) navigate("/browse", { replace: true });
@@ -35,18 +37,20 @@ export default function Landing() {
 
       <div className="relative z-10 w-full max-w-sm mx-auto px-4 py-12 flex flex-col items-center gap-8">
         {/* Logo */}
-        <img
-          src="https://reelmotionapp.com/api/images/brand-assets/1769360187602-m8s1tb5sryq.png"
-          alt="ReelMotion"
-          className="h-24 md:h-32 lg:h-40 w-auto object-contain"
-        />
+        {logo ? (
+          <img src={logo} alt="ReelMotion" className="h-24 md:h-32 lg:h-40 w-auto object-contain" />
+        ) : (
+          <span className="text-white font-black text-4xl md:text-5xl tracking-tight">
+            REEL<span style={{ color: '#E8001D' }}>MOTION</span>
+          </span>
+        )}
 
         {/* Tagline */}
-        <img
-          src="https://reelmotionapp.com/api/images/brand-assets/1769360276020-fzivnjjwnwu.png"
-          alt="Watch The Culture"
-          className="h-12 md:h-14 lg:h-16 w-auto object-contain"
-        />
+        {tagline ? (
+          <img src={tagline} alt="Watch The Culture" className="h-12 md:h-14 lg:h-16 w-auto object-contain" />
+        ) : (
+          <span className="text-zinc-400 text-sm font-semibold tracking-widest uppercase">Watch The Culture</span>
+        )}
 
         {/* Sign-in card */}
         <div className="w-full relative">

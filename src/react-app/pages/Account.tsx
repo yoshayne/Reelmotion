@@ -3,6 +3,7 @@ import { useUser, useClerk } from "@clerk/clerk-react";
 import { useNavigate, Link } from "react-router";
 import { Camera, CheckCircle, ExternalLink, LogOut, Crown, User } from "lucide-react";
 import { apiFetch, apiFetchForm } from "@/react-app/utils/api";
+import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
 import { hasAccess } from "@/react-app/utils/access";
 import type { Subscription } from "@/shared/types";
 
@@ -17,6 +18,7 @@ function getInitials(name: string, email: string): string {
 
 export default function AccountPage() {
   const { user, isLoaded } = useUser();
+  const { logo, tagline } = useBrandAssets();
   const { signOut } = useClerk();
   const navigate = useNavigate();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -103,11 +105,11 @@ export default function AccountPage() {
         {/* Logo */}
         <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4" style={{ paddingTop: 'max(env(safe-area-inset-top), 60px)', paddingBottom: '12px' }}>
           <Link to="/browse">
-            <img
-              src="https://reelmotionapp.com/api/images/brand-assets/1769360187602-m8s1tb5sryq.png"
-              alt="ReelMotion"
-              className="h-7 w-auto"
-            />
+            {logo ? (
+              <img src={logo} alt="ReelMotion" className="h-7 w-auto" />
+            ) : (
+              <span className="text-white font-black text-base tracking-tight">REEL<span style={{ color: '#E8001D' }}>MOTION</span></span>
+            )}
           </Link>
           <button
             onClick={handleLogout}
@@ -314,12 +316,11 @@ export default function AccountPage() {
         {/* Footer tagline */}
         <div className="mt-8 flex items-center gap-4">
           <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }} />
-          <img
-            src="https://019af3d1-a2f2-7505-8523-8b0f9dcff281.mochausercontent.com/Watch-the-culture-tag.png"
-            alt="Watch The Culture"
-            className="h-4 object-contain"
-            style={{ opacity: 0.4 }}
-          />
+          {tagline ? (
+            <img src={tagline} alt="Watch The Culture" className="h-4 object-contain" style={{ opacity: 0.4 }} />
+          ) : (
+            <span className="text-[10px] font-semibold tracking-widest uppercase text-white/25">Watch The Culture</span>
+          )}
           <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }} />
         </div>
       </div>

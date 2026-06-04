@@ -351,7 +351,14 @@ app.get("/api/images/:key", async (c) => {
   return c.redirect(publicUrl);
 });
 
-app.post("/api/contest", async (c) => {
+app.get("/api/brand-assets/public", async (c) => {
+  const result = await query("SELECT name, file_key FROM brand_assets ORDER BY created_at ASC");
+  const assets: Record<string, string> = {};
+  for (const row of result.rows) {
+    assets[row.name] = getPublicUrl(row.file_key);
+  }
+  return c.json(assets);
+});
   const body = await c.req.json<{
     film_title: string;
     runtime: string;

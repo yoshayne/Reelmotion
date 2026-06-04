@@ -4,6 +4,7 @@ import { useUser } from "@clerk/clerk-react";
 import { Play, BookmarkPlus, BookmarkCheck, X } from "lucide-react";
 import { apiFetch } from "@/react-app/utils/api";
 import type { BrowseData, Video, Series, CarouselItem, PromoPopup } from "@/shared/types";
+import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
 
 type TabType = "all" | "new" | "series" | "movies" | "clips";
 
@@ -19,6 +20,7 @@ export default function Browse() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [continueWatching, setContinueWatching] = useState<any[]>([]);
   const heroIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { tagline } = useBrandAssets();
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) navigate("/", { replace: true });
@@ -396,12 +398,11 @@ export default function Browse() {
         {/* Footer */}
         <div className="mt-10 px-4 flex items-center gap-4">
           <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }} />
-          <img
-            src="https://019af3d1-a2f2-7505-8523-8b0f9dcff281.mochausercontent.com/Watch-the-culture-tag.png"
-            alt="Watch The Culture"
-            className="h-4 object-contain"
-            style={{ opacity: 0.4 }}
-          />
+          {tagline ? (
+            <img src={tagline} alt="Watch The Culture" className="h-4 object-contain" style={{ opacity: 0.4 }} />
+          ) : (
+            <span className="text-[10px] font-semibold tracking-widest uppercase text-white/25">Watch The Culture</span>
+          )}
           <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }} />
         </div>
       </div>

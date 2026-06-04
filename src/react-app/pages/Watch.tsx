@@ -4,6 +4,7 @@ import { useUser } from "@clerk/clerk-react";
 import MuxPlayerWrapper from "@/react-app/components/MuxPlayerWrapper";
 import { apiFetch } from "@/react-app/utils/api";
 import { hasAccess } from "@/react-app/utils/access";
+import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
 import type { Video, Subscription } from "@/shared/types";
 import { Bookmark, BookmarkCheck, ChevronRight, Lock, Play, ArrowLeft, SkipForward } from "lucide-react";
 
@@ -16,6 +17,7 @@ export default function WatchPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isLoaded } = useUser();
+  const { tagline } = useBrandAssets();
   const [watchData, setWatchData] = useState<WatchData | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [inWatchlist, setInWatchlist] = useState(false);
@@ -327,7 +329,7 @@ export default function WatchPage() {
           <div className="mt-10 flex items-center gap-4">
             <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }} />
             <img
-              src="https://019af3d1-a2f2-7505-8523-8b0f9dcff281.mochausercontent.com/Watch-the-culture-tag.png"
+              src={tagline}
               alt="Watch The Culture"
               className="h-4 object-contain"
               style={{ opacity: 0.4 }}
