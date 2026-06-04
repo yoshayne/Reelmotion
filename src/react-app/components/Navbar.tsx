@@ -41,15 +41,16 @@ export default function Navbar() {
   return (
     <nav
       className="fixed top-0 left-0 right-0 z-50 px-6 bg-black/90 backdrop-blur-md border-b border-white/5"
-      style={{ paddingTop: 'max(env(safe-area-inset-top), 60px)', paddingBottom: '20px' }}
+      style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)', paddingBottom: '12px' }}
     >
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className="max-w-7xl mx-auto flex items-center justify-between h-12">
         <div className="flex items-center gap-8">
           <Link to="/browse">
             <img
               src="https://reelmotionapp.com/api/images/brand-assets/1769360187602-m8s1tb5sryq.png"
               alt="ReelMotion"
               className="h-8 w-auto"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
           </Link>
           <div className="hidden md:flex items-center gap-6 text-sm">
@@ -72,33 +73,43 @@ export default function Navbar() {
                 <img
                   src={profilePic}
                   alt="Profile"
-                  className="w-8 h-8 rounded-full object-cover"
+                  className="w-9 h-9 rounded-full object-cover"
                   style={{ outline: '2px solid rgba(232,0,29,0.5)', outlineOffset: '1px' }}
                 />
               ) : (
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  className="w-9 h-9 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: '#E8001D' }}
                 >
-                  <User className="w-5 h-5" />
+                  <User className="w-5 h-5 text-white" />
                 </div>
               )}
             </button>
             {showAccountMenu && (
               <div
-                className="absolute right-0 mt-2 w-48 bg-gray-900 border rounded-lg shadow-xl py-2 backdrop-blur-xl"
+                className="absolute right-0 mt-2 w-48 bg-gray-900 border rounded-lg shadow-xl py-2 backdrop-blur-xl z-50"
                 style={{ borderColor: 'rgba(232,0,29,0.3)', boxShadow: '0 20px 60px rgba(232,0,29,0.2)' }}
               >
                 <Link
                   to="/account"
-                  className="block px-4 py-2 hover:bg-[#E8001D]/20 transition-colors"
+                  className="block px-4 py-3 text-sm hover:bg-[#E8001D]/20 transition-colors"
                   onClick={() => setShowAccountMenu(false)}
                 >
                   Account
                 </Link>
+                {(userRole === "admin" || userRole === "creator") && (
+                  <Link
+                    to="/admin"
+                    className="block px-4 py-3 text-sm hover:bg-[#E8001D]/20 transition-colors md:hidden"
+                    onClick={() => setShowAccountMenu(false)}
+                  >
+                    Admin
+                  </Link>
+                )}
+                <div className="border-t my-1" style={{ borderColor: 'rgba(255,255,255,0.08)' }} />
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 hover:bg-[#E8001D]/20 transition-colors"
+                  className="w-full text-left px-4 py-3 text-sm hover:bg-[#E8001D]/20 transition-colors text-red-400"
                 >
                   Sign Out
                 </button>

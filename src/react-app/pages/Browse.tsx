@@ -125,7 +125,8 @@ export default function Browse() {
       )}
 
       {/* Hero Section */}
-      <div className="relative overflow-hidden" style={{ height: 280, paddingTop: 'max(env(safe-area-inset-top), 60px)' }}>
+      {/* Hero Section — sits below the fixed navbar (navbar is ~56px tall) */}
+      <div className="relative overflow-hidden" style={{ height: 280, marginTop: 56 }}>
         {hero?.image_url && (
           <img src={hero.image_url} alt={hero.title} className="absolute inset-0 w-full h-full object-cover" style={{ zIndex: 0 }} />
         )}
