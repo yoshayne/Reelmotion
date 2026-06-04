@@ -1,15 +1,17 @@
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useUser, useClerk } from "@clerk/clerk-react";
 import { Search, User } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { apiFetch } from "@/react-app/utils/api";
 
 export default function Navbar() {
-  const { user } = useUser();
+  const { user, isSignedIn } = useUser();
   const { signOut } = useClerk();
+  const navigate = useNavigate();
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [userRole, setUserRole] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [logoError, setLogoError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -45,13 +47,19 @@ export default function Navbar() {
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between h-12">
         <div className="flex items-center gap-8">
-          <Link to="/browse">
-            <img
-              src="https://reelmotionapp.com/api/images/brand-assets/1769360187602-m8s1tb5sryq.png"
-              alt="ReelMotion"
-              className="h-8 w-auto"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
+          <Link to="/browse" className="flex items-center">
+            {!logoError ? (
+              <img
+                src="https://reelmotionapp.com/api/images/brand-assets/1769360187602-m8s1tb5sryq.png"
+                alt="ReelMotion"
+                className="h-8 w-auto"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <span className="text-white font-black text-lg tracking-tight">
+                REEL<span style={{ color: '#E8001D' }}>MOTION</span>
+              </span>
+            )}
           </Link>
           <div className="hidden md:flex items-center gap-6 text-sm">
             <Link to="/browse" className="hover:text-[#E8001D] transition-colors font-medium">Browse</Link>
@@ -66,7 +74,7 @@ export default function Navbar() {
           </button>
           <div className="relative" ref={menuRef}>
             <button
-              onClick={() => setShowAccountMenu(!showAccountMenu)}
+              onClick={() => isSignedIn ? setShowAccountMenu(!showAccountMenu) : navigate("/")}
               className="flex items-center gap-2 p-2 hover:bg-white/10 rounded-full transition-colors"
             >
               {profilePic ? (
@@ -85,7 +93,7 @@ export default function Navbar() {
                 </div>
               )}
             </button>
-            {showAccountMenu && (
+            {isSignedIn && showAccountMenu && (
               <div
                 className="absolute right-0 mt-2 w-48 bg-gray-900 border rounded-lg shadow-xl py-2 backdrop-blur-xl z-50"
                 style={{ borderColor: 'rgba(232,0,29,0.3)', boxShadow: '0 20px 60px rgba(232,0,29,0.2)' }}
