@@ -8,6 +8,7 @@ import Stripe from "stripe";
 import { stripe, createCheckoutSession, createPortalSession } from "./stripe.js";
 import { uploadFile, getPublicUrl } from "./storage.js";
 import { getCached, invalidateCache } from "./redis.js";
+import { runMigrations } from "./migrate.js";
 
 const app = new Hono();
 
@@ -44,7 +45,13 @@ app.post("/api/webhooks/clerk", async (c) => {
 
     const { type, data } = evt;
     console.log("Clerk webhook received:", type);
-    const primaryEmail = data.email_addresses.find(
+
+    // Only handle user events — other event types (email.created, session.*, etc.) have different shapes
+    if (type !== "user.created" && type !== "user.updated") {
+      return c.json({ success: true });
+    }
+
+    const primaryEmail = data.email_addresses?.find(
       (e) => e.id === data.primary_email_address_id
     )?.email_address;
 
@@ -927,17 +934,23 @@ app.get("/*", async (c) => {
   );
 });
 
-// ─── Ensure admin accounts have correct role on boot ────────────────────────
-const ADMIN_EMAILS = ["romediastudios@gmail.com"];
-query(
-  `UPDATE users SET role = 'admin' WHERE email = ANY($1::text[]) AND role != 'admin'`,
-  [ADMIN_EMAILS]
-).catch(() => {});
-
 // ─── Start server ────────────────────────────────────────────────────────────
 const port = Number(process.env.PORT) || 3000;
-serve({ fetch: app.fetch, port }, () => {
-  console.log(`ReelMotion server running on port ${port}`);
-});
+
+runMigrations()
+  .then(() => {
+    // Ensure admin accounts have correct role after migrations
+    const ADMIN_EMAILS = ["romediastudios@gmail.com"];
+    return query(
+      `UPDATE users SET role = 'admin' WHERE email = ANY($1::text[]) AND role != 'admin'`,
+      [ADMIN_EMAILS]
+    );
+  })
+  .catch((err) => console.error("Migration error:", err))
+  .finally(() => {
+    serve({ fetch: app.fetch, port }, () => {
+      console.log(`ReelMotion server running on port ${port}`);
+    });
+  });
 
 export default app;
