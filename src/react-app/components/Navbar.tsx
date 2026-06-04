@@ -69,6 +69,15 @@ export default function Navbar() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {isSignedIn && (
+            <button
+              onClick={handleLogout}
+              className="hidden md:block text-xs font-bold tracking-wide px-3 py-1.5 border border-white/20 hover:border-[#E8001D]/50 hover:text-[#E8001D] transition-colors"
+              style={{ transform: 'skewX(-6deg)' }}
+            >
+              <span style={{ transform: 'skewX(6deg)', display: 'block' }}>SIGN OUT</span>
+            </button>
+          )}
           <button className="p-2.5 hover:bg-white/10 rounded-full transition-colors">
             <Search className="w-5 h-5" style={{ color: '#E8001D' }} />
           </button>
@@ -77,21 +86,25 @@ export default function Navbar() {
               onClick={() => isSignedIn ? setShowAccountMenu(!showAccountMenu) : navigate("/")}
               className="flex items-center gap-2 p-2 hover:bg-white/10 rounded-full transition-colors"
             >
-              {profilePic ? (
-                <img
-                  src={profilePic}
-                  alt="Profile"
-                  className="w-9 h-9 rounded-full object-cover"
-                  style={{ outline: '2px solid rgba(232,0,29,0.5)', outlineOffset: '1px' }}
-                />
-              ) : (
+              <div className="relative w-9 h-9">
+                {/* Always show red circle base */}
                 <div
                   className="w-9 h-9 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: '#E8001D' }}
                 >
                   <User className="w-5 h-5 text-white" />
                 </div>
-              )}
+                {/* Overlay profile pic on top if available */}
+                {profilePic && (
+                  <img
+                    src={profilePic}
+                    alt="Profile"
+                    className="absolute inset-0 w-9 h-9 rounded-full object-cover"
+                    style={{ outline: '2px solid rgba(232,0,29,0.5)', outlineOffset: '1px' }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                )}
+              </div>
             </button>
             {isSignedIn && showAccountMenu && (
               <div
