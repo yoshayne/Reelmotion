@@ -25,7 +25,11 @@ app.post("/api/webhooks/clerk", async (c) => {
   };
 
   try {
-    const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET!);
+    if (!process.env.CLERK_WEBHOOK_SECRET) {
+      console.error("CLERK_WEBHOOK_SECRET is not set");
+      return c.json({ error: "Webhook secret not configured" }, 500);
+    }
+    const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
     const evt = wh.verify(payload, headers) as {
       type: string;
       data: {
@@ -39,6 +43,7 @@ app.post("/api/webhooks/clerk", async (c) => {
     };
 
     const { type, data } = evt;
+    console.log("Clerk webhook received:", type);
     const primaryEmail = data.email_addresses.find(
       (e) => e.id === data.primary_email_address_id
     )?.email_address;

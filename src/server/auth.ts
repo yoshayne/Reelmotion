@@ -33,13 +33,29 @@ export const clerkAuth: MiddlewareHandler = async (c: Context, next: Next) => {
     const verifiedToken = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY! });
     const clerkUserId = verifiedToken.sub;
 
-    const result = await query<AuthUser>(
+    let result = await query<AuthUser>(
       "SELECT id, clerk_user_id, email, role, display_name, avatar_url FROM users WHERE clerk_user_id = $1",
       [clerkUserId]
     );
 
     if (result.rows.length === 0) {
-      return c.json({ error: "User not found" }, 404);
+      // User authenticated but not in DB yet (webhook may be delayed) — auto-create
+      const ADMIN_EMAILS = ["romediastudios@gmail.com"];
+      const clerkUser = await clerk.users.getUser(clerkUserId);
+      const email = clerkUser.emailAddresses.find(
+        (e) => e.id === clerkUser.primaryEmailAddressId
+      )?.emailAddress ?? "";
+      const role = ADMIN_EMAILS.includes(email) ? "admin" : "viewer";
+      const displayName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || null;
+      const avatarUrl = clerkUser.imageUrl || null;
+
+      result = await query<AuthUser>(
+        `INSERT INTO users (clerk_user_id, email, role, display_name, avatar_url)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (clerk_user_id) DO UPDATE SET email = EXCLUDED.email, updated_at = NOW()
+         RETURNING id, clerk_user_id, email, role, display_name, avatar_url`,
+        [clerkUserId, email, role, displayName, avatarUrl]
+      );
     }
 
     c.set("user", result.rows[0]);
