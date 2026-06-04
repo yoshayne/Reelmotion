@@ -1,4 +1,4 @@
-import { createClerkClient } from "@clerk/backend";
+import { createClerkClient, verifyToken } from "@clerk/backend";
 import type { Context, MiddlewareHandler, Next } from "hono";
 import { query } from "./db.js";
 
@@ -30,7 +30,7 @@ export const clerkAuth: MiddlewareHandler = async (c: Context, next: Next) => {
   const token = authHeader.slice(7);
 
   try {
-    const verifiedToken = await clerk.verifyToken(token);
+    const verifiedToken = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY! });
     const clerkUserId = verifiedToken.sub;
 
     const result = await query<AuthUser>(

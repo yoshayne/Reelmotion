@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { useUser } from "@clerk/clerk-react";
 import MuxPlayerWrapper from "@/react-app/components/MuxPlayerWrapper";
@@ -24,7 +24,7 @@ export default function WatchPage() {
   const [error, setError] = useState<string | null>(null);
   const [showSkipIntro, setShowSkipIntro] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const skipIntroRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
 
   useEffect(() => {
     if (!id) return;

@@ -5,7 +5,7 @@ import { Webhook } from "svix";
 import { query, pool } from "./db.js";
 import { clerkAuth, adminAuth, clerk } from "./auth.js";
 import { stripe, createCheckoutSession, createPortalSession } from "./stripe.js";
-import { uploadFile, deleteFile, getPublicUrl } from "./storage.js";
+import { uploadFile, getPublicUrl } from "./storage.js";
 import { getCached, invalidateCache } from "./redis.js";
 
 const app = new Hono();

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router";
+import { Link } from "react-router";
 import { useUser, useClerk } from "@clerk/clerk-react";
 import { apiFetch } from "@/react-app/utils/api";
 import { Check, Film, Users, Zap, Heart, Crown } from "lucide-react";
@@ -7,7 +7,6 @@ import { Check, Film, Users, Zap, Heart, Crown } from "lucide-react";
 export default function SubscribePage() {
   const { user, isLoaded } = useUser();
   const { openSignIn } = useClerk();
-  const navigate = useNavigate();
   const [selected, setSelected] = useState<"monthly" | "yearly">("yearly");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

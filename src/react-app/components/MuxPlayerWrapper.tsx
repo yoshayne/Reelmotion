@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { Video } from "@/shared/types";
 
 interface MuxPlayerWrapperProps {
@@ -41,7 +41,7 @@ export default function MuxPlayerWrapper({
     pause: () => void;
   }>(null);
   const [showSkipIntro, setShowSkipIntro] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   useEffect(() => {
     const script = document.createElement("script");
