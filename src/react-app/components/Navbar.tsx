@@ -1,0 +1,112 @@
+import { Link } from "react-router";
+import { useUser, useClerk } from "@clerk/clerk-react";
+import { Search, User } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { apiFetch } from "@/react-app/utils/api";
+
+export default function Navbar() {
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [userRole, setUserRole] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowAccountMenu(false);
+    };
+    if (showAccountMenu) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showAccountMenu]);
+
+  useEffect(() => {
+    if (!user) return;
+    apiFetch("/api/users/me").then(async (res) => {
+      if (res.ok) {
+        const data = await res.json();
+        setUserRole(data.role || "");
+        setAvatarUrl(data.avatar_url || "");
+      }
+    }).catch(() => {});
+  }, [user]);
+
+  const handleLogout = async () => {
+    await signOut();
+    window.location.href = "/";
+  };
+
+  const profilePic = avatarUrl || user?.imageUrl || "";
+
+  return (
+    <nav
+      className="fixed top-0 left-0 right-0 z-50 px-6 bg-black/90 backdrop-blur-md border-b border-white/5"
+      style={{ paddingTop: 'max(env(safe-area-inset-top), 60px)', paddingBottom: '20px' }}
+    >
+      <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="flex items-center gap-8">
+          <Link to="/browse">
+            <img
+              src="https://reelmotionapp.com/api/images/brand-assets/1769360187602-m8s1tb5sryq.png"
+              alt="ReelMotion"
+              className="h-8 w-auto"
+            />
+          </Link>
+          <div className="hidden md:flex items-center gap-6 text-sm">
+            <Link to="/browse" className="hover:text-[#E8001D] transition-colors font-medium">Browse</Link>
+            {(userRole === "admin" || userRole === "creator") && (
+              <Link to="/admin" className="hover:text-[#E8001D] transition-colors font-medium">Admin</Link>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button className="p-2.5 hover:bg-white/10 rounded-full transition-colors">
+            <Search className="w-5 h-5" style={{ color: '#E8001D' }} />
+          </button>
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setShowAccountMenu(!showAccountMenu)}
+              className="flex items-center gap-2 p-2 hover:bg-white/10 rounded-full transition-colors"
+            >
+              {profilePic ? (
+                <img
+                  src={profilePic}
+                  alt="Profile"
+                  className="w-8 h-8 rounded-full object-cover"
+                  style={{ outline: '2px solid rgba(232,0,29,0.5)', outlineOffset: '1px' }}
+                />
+              ) : (
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: '#E8001D' }}
+                >
+                  <User className="w-5 h-5" />
+                </div>
+              )}
+            </button>
+            {showAccountMenu && (
+              <div
+                className="absolute right-0 mt-2 w-48 bg-gray-900 border rounded-lg shadow-xl py-2 backdrop-blur-xl"
+                style={{ borderColor: 'rgba(232,0,29,0.3)', boxShadow: '0 20px 60px rgba(232,0,29,0.2)' }}
+              >
+                <Link
+                  to="/account"
+                  className="block px-4 py-2 hover:bg-[#E8001D]/20 transition-colors"
+                  onClick={() => setShowAccountMenu(false)}
+                >
+                  Account
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-2 hover:bg-[#E8001D]/20 transition-colors"
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+}
