@@ -185,9 +185,8 @@ app.post("/api/billing/stripe-webhook", async (c) => {
       }
 
       case "invoice.payment_failed": {
-        const invoice = event.data.object as Stripe.Invoice;
-        const rawSub = invoice.subscription;
-        const subId = typeof rawSub === "string" ? rawSub : (rawSub as Stripe.Subscription | null)?.id ?? null;
+        const invoice = event.data.object as unknown as { subscription?: string | null; parent?: { subscription_details?: { subscription?: string | null } } };
+        const subId = invoice.subscription ?? invoice.parent?.subscription_details?.subscription ?? null;
         if (!subId) break;
         const result = await query(
           `UPDATE subscriptions SET status = 'past_due', updated_at = NOW()
