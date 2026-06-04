@@ -1,6 +1,6 @@
 declare global {
   interface Window {
-    __clerk?: {
+    Clerk?: {
       session?: {
         getToken: () => Promise<string | null>;
       };
@@ -8,13 +8,16 @@ declare global {
   }
 }
 
-export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  let token: string | null = null;
+async function getAuthToken(): Promise<string | null> {
   try {
-    token = (await window.__clerk?.session?.getToken()) ?? null;
+    return (await window.Clerk?.session?.getToken()) ?? null;
   } catch {
-    // not signed in
+    return null;
   }
+}
+
+export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = await getAuthToken();
 
   return fetch(url, {
     ...options,
@@ -27,12 +30,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
 }
 
 export async function apiFetchForm(url: string, formData: FormData): Promise<Response> {
-  let token: string | null = null;
-  try {
-    token = (await window.__clerk?.session?.getToken()) ?? null;
-  } catch {
-    // not signed in
-  }
+  const token = await getAuthToken();
 
   return fetch(url, {
     method: "POST",
