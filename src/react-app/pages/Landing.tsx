@@ -1,126 +1,101 @@
+import { useSignIn, useUser } from "@clerk/clerk-react";
+import { useNavigate } from "react-router";
 import { useEffect } from "react";
-import { useNavigate, Link } from "react-router";
-import { useUser, useClerk } from "@clerk/clerk-react";
-import { Play, Film, Users, Zap, Heart } from "lucide-react";
 
-export default function LandingPage() {
-  const { user, isLoaded } = useUser();
-  const { openSignIn } = useClerk();
+export default function Landing() {
+  const { isSignedIn } = useUser();
+  const { signIn } = useSignIn();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isLoaded && user) navigate("/browse");
-  }, [isLoaded, user, navigate]);
+    if (isSignedIn) navigate("/browse", { replace: true });
+  }, [isSignedIn, navigate]);
 
-  const features = [
-    { icon: Film, title: "Independent Films", desc: "Discover stories you won't find on mainstream platforms" },
-    { icon: Users, title: "Filmmaker Community", desc: "Connect with creators, watch Q&As and behind-the-scenes" },
-    { icon: Zap, title: "Early Access", desc: "Members get first access to new releases" },
-    { icon: Heart, title: "Support The Culture", desc: "Your membership directly supports independent filmmakers" },
-  ];
+  const handleGoogleSignIn = () => {
+    signIn?.authenticateWithRedirect({
+      strategy: "oauth_google",
+      redirectUrl: "/auth-callback",
+      redirectUrlComplete: "/browse",
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Navbar */}
-      <nav
-        className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 md:px-8 h-14 bg-black/90 backdrop-blur-md border-b border-white/5"
-        style={{ paddingTop: "max(env(safe-area-inset-top), 0px)" }}
-      >
-        <span className="text-xl font-black tracking-tight">
-          REELMOTI<span className="text-red-600">O</span>N™
-        </span>
-        <button
-          onClick={() => openSignIn()}
-          className="px-4 py-1.5 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-medium transition-colors"
-        >
-          Sign In
-        </button>
-      </nav>
-
-      {/* Hero */}
-      <div
-        className="relative flex flex-col items-center justify-center min-h-screen px-4 text-center"
-        style={{ paddingTop: "max(env(safe-area-inset-top), 3.5rem)" }}
-      >
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-red-950/20 via-black to-black pointer-events-none" />
-
-        <div className="relative z-10 max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-600/20 border border-red-600/30 rounded-full text-sm text-red-400 mb-6">
-            <Film className="w-4 h-4" />
-            Watch The Culture
-          </div>
-
-          <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-4 leading-none">
-            REELMOTI<span className="text-red-600">O</span>N™
-          </h1>
-
-          <p className="text-lg md:text-xl text-gray-400 mb-8 max-w-lg mx-auto leading-relaxed">
-            A community-first platform for independent film culture. Join thousands of filmmakers and fans.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button
-              onClick={() => openSignIn()}
-              className="px-8 py-4 bg-red-600 hover:bg-red-700 rounded-xl font-bold text-lg transition-colors flex items-center justify-center gap-2"
-            >
-              <Play className="w-5 h-5 fill-white" />
-              Start Watching
-            </button>
-            <Link
-              to="/subscribe"
-              className="px-8 py-4 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl font-bold text-lg transition-colors"
-            >
-              Join the Community
-            </Link>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-black to-zinc-950 text-white overflow-hidden relative flex items-center justify-center">
+      {/* Ambient blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full blur-[120px] animate-pulse"
+          style={{ backgroundColor: 'rgba(232,0,29,0.05)', animationDuration: '8s' }}
+        />
+        <div
+          className="absolute bottom-0 right-1/4 w-[500px] h-[500px] rounded-full blur-[120px] animate-pulse"
+          style={{ backgroundColor: 'rgba(245,158,11,0.05)', animationDuration: '10s', animationDelay: '2s' }}
+        />
       </div>
 
-      {/* Features */}
-      <div className="max-w-4xl mx-auto px-4 py-20">
-        <h2 className="text-3xl font-black text-center mb-12">
-          More than <span className="text-red-600">streaming</span>
-        </h2>
-        <div className="grid sm:grid-cols-2 gap-6">
-          {features.map(({ icon: Icon, title, desc }) => (
+      <div className="relative z-10 w-full max-w-sm mx-auto px-4 py-12 flex flex-col items-center gap-8">
+        {/* Logo */}
+        <img
+          src="https://reelmotionapp.com/api/images/brand-assets/1769360187602-m8s1tb5sryq.png"
+          alt="ReelMotion"
+          className="h-24 md:h-32 lg:h-40 w-auto object-contain"
+        />
+
+        {/* Tagline */}
+        <img
+          src="https://reelmotionapp.com/api/images/brand-assets/1769360276020-fzivnjjwnwu.png"
+          alt="Watch The Culture"
+          className="h-12 md:h-14 lg:h-16 w-auto object-contain"
+        />
+
+        {/* Sign-in card */}
+        <div className="w-full relative">
+          <div
+            className="absolute -inset-1 rounded-2xl blur-xl opacity-30"
+            style={{ background: 'linear-gradient(to right, rgba(232,0,29,0.3), rgba(245,158,11,0.3), rgba(232,0,29,0.3))' }}
+          />
+          <div className="relative bg-gradient-to-br from-zinc-900/90 via-zinc-900/80 to-black/90 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-8">
+            {/* Top accent */}
             <div
-              key={title}
-              className="p-6 bg-gray-900/50 border border-red-600/10 rounded-xl hover:border-red-600/30 transition-colors"
+              className="h-px w-full mb-6"
+              style={{ background: 'linear-gradient(to right, transparent, rgba(245,158,11,0.3), transparent)' }}
+            />
+            <h2 className="text-xl font-bold text-center mb-2">Join the Community</h2>
+            <p className="text-sm text-zinc-400 text-center mb-6">Stream exclusive Black culture content</p>
+
+            {/* Google button */}
+            <button
+              onClick={handleGoogleSignIn}
+              className="w-full flex items-center justify-center gap-3 bg-white text-black font-semibold py-3 px-6 rounded-xl hover:bg-zinc-100 transition-all group relative overflow-hidden"
             >
-              <div className="w-12 h-12 bg-red-600/20 rounded-xl flex items-center justify-center mb-4">
-                <Icon className="w-6 h-6 text-red-500" />
-              </div>
-              <h3 className="font-bold text-lg mb-1">{title}</h3>
-              <p className="text-gray-400 text-sm">{desc}</p>
+              <svg width="20" height="20" viewBox="0 0 24 24">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              <span>Continue with Google</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+            </button>
+
+            {/* Bottom accent */}
+            <div
+              className="h-px w-full mt-6"
+              style={{ background: 'linear-gradient(to right, transparent, rgba(245,158,11,0.3), transparent)' }}
+            />
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center gap-8">
+          {[['ORIGINAL', 'Content'], ['4K', 'Quality'], ['∞', 'Episodes']].map(([val, label]) => (
+            <div key={val} className="text-center">
+              <div className="text-2xl font-black" style={{ color: '#F59E0B' }}>{val}</div>
+              <div className="text-xs text-zinc-500 mt-1">{label}</div>
             </div>
           ))}
         </div>
       </div>
-
-      {/* CTA */}
-      <div className="max-w-lg mx-auto px-4 py-16 text-center">
-        <h2 className="text-3xl font-black mb-4">Ready to join?</h2>
-        <p className="text-gray-400 mb-8">Choose monthly or annual membership and start watching today.</p>
-        <Link
-          to="/subscribe"
-          className="inline-block px-10 py-4 bg-red-600 hover:bg-red-700 rounded-xl font-bold text-lg transition-colors"
-        >
-          Join the Community
-        </Link>
-      </div>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-900 py-8 text-center text-sm text-gray-600">
-        <div className="flex justify-center gap-6 mb-3">
-          <Link to="/privacy" className="hover:text-gray-400 transition-colors">Privacy</Link>
-          <Link to="/terms" className="hover:text-gray-400 transition-colors">Terms</Link>
-          <Link to="/support" className="hover:text-gray-400 transition-colors">Support</Link>
-          <Link to="/contest" className="hover:text-gray-400 transition-colors">Submit Film</Link>
-          <Link to="/epk" className="hover:text-gray-400 transition-colors">EPK</Link>
-        </div>
-        <p>© {new Date().getFullYear()} ReelMotion. Watch The Culture.</p>
-      </footer>
     </div>
   );
 }
