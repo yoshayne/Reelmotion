@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { Webhook } from "svix";
 import { query, pool } from "./db.js";
 import { clerkAuth, adminAuth, clerk } from "./auth.js";
+import Stripe from "stripe";
 import { stripe, createCheckoutSession, createPortalSession } from "./stripe.js";
 import { uploadFile, getPublicUrl } from "./storage.js";
 import { getCached, invalidateCache } from "./redis.js";
@@ -101,11 +102,12 @@ app.post("/api/billing/stripe-webhook", async (c) => {
         if (!userId) break;
 
         const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-        const priceId = subscription.items.data[0]?.price.id;
+        const sub = subscription as unknown as Stripe.Subscription & { current_period_start: number; current_period_end: number };
+        const priceId = sub.items.data[0]?.price.id;
         const plan =
           priceId === process.env.STRIPE_MONTHLY_PRICE_ID ? "monthly" : "yearly";
-        const periodStart = new Date(subscription.current_period_start * 1000);
-        const periodEnd = new Date(subscription.current_period_end * 1000);
+        const periodStart = new Date(sub.current_period_start * 1000);
+        const periodEnd = new Date(sub.current_period_end * 1000);
 
         await query(
           `INSERT INTO subscriptions (user_id, plan, status, stripe_customer_id, stripe_subscription_id, stripe_price_id, period_start_date, period_end_date)
@@ -136,13 +138,9 @@ app.post("/api/billing/stripe-webhook", async (c) => {
       }
 
       case "customer.subscription.updated": {
-        const sub = event.data.object as {
-          id: string;
-          status: string;
-          items: { data: Array<{ price: { id: string } }> };
+        const sub = event.data.object as unknown as Stripe.Subscription & {
           current_period_start: number;
           current_period_end: number;
-          metadata: { user_id?: string };
         };
         const priceId = sub.items.data[0]?.price.id;
         const plan =
@@ -187,11 +185,14 @@ app.post("/api/billing/stripe-webhook", async (c) => {
       }
 
       case "invoice.payment_failed": {
-        const invoice = event.data.object as { subscription: string };
+        const invoice = event.data.object as Stripe.Invoice;
+        const rawSub = invoice.subscription;
+        const subId = typeof rawSub === "string" ? rawSub : (rawSub as Stripe.Subscription | null)?.id ?? null;
+        if (!subId) break;
         const result = await query(
           `UPDATE subscriptions SET status = 'past_due', updated_at = NOW()
            WHERE stripe_subscription_id = $1 RETURNING user_id`,
-          [invoice.subscription]
+          [subId]
         );
         if (result.rows[0]) {
           await invalidateCache(`subscription:${result.rows[0].user_id}`);
