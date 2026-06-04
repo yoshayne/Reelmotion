@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import Navbar from "@/react-app/components/Navbar";
 import { useAdminRole } from "@/react-app/hooks/useAdminRole";
 import { apiFetch } from "@/react-app/utils/api";
 import type { CarouselItem } from "@/shared/types";
@@ -38,7 +37,7 @@ export default function AdminCarousel() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+
       <div className="max-w-4xl mx-auto px-4 pb-16" style={{ paddingTop: "calc(max(env(safe-area-inset-top), 0px) + 5rem)" }}>
         <div className="flex items-center justify-between mb-6">
           <div>

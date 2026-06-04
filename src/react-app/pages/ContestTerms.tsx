@@ -1,10 +1,9 @@
 import { Link } from "react-router";
-import Navbar from "@/react-app/components/Navbar";
 
 export default function ContestTermsPage() {
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+
       <div
         className="max-w-2xl mx-auto px-4 pb-16"
         style={{ paddingTop: "calc(max(env(safe-area-inset-top), 0px) + 5rem)" }}

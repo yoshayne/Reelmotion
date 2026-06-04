@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { useUser } from "@clerk/clerk-react";
-import Navbar from "@/react-app/components/Navbar";
 import { apiFetch } from "@/react-app/utils/api";
 import { hasAccess } from "@/react-app/utils/access";
 import type { Series, Video, Subscription } from "@/shared/types";
@@ -60,7 +59,7 @@ export default function SeriesPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+
 
       {/* Hero */}
       <div className="relative h-64 md:h-96 overflow-hidden">

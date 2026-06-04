@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router";
-import Navbar from "@/react-app/components/Navbar";
 import type { Series, Video } from "@/shared/types";
 import { Play, ChevronLeft } from "lucide-react";
 
@@ -45,7 +44,7 @@ export default function SeriesInfo() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+
 
       <div className="relative h-72 md:h-[55vh] overflow-hidden">
         {imageUrl && (
@@ -62,7 +61,7 @@ export default function SeriesInfo() {
         <button
           onClick={() => navigate(-1)}
           className="absolute top-4 left-4 flex items-center gap-1 text-sm text-gray-300 hover:text-white"
-          style={{ marginTop: "max(env(safe-area-inset-top), 56px)" }}
+          style={{ marginTop: "max(env(safe-area-inset-top), 72px)" }}
         >
           <ChevronLeft className="w-4 h-4" /> Back
         </button>

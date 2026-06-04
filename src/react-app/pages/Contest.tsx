@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import Navbar from "@/react-app/components/Navbar";
 import { Film, CheckCircle } from "lucide-react";
 
 interface FormData {
@@ -55,10 +54,10 @@ export default function ContestPage() {
   if (submitted) {
     return (
       <div className="min-h-screen bg-black text-white">
-        <Navbar />
+  
         <div
           className="flex flex-col items-center justify-center min-h-screen px-4 text-center"
-          style={{ paddingTop: "max(env(safe-area-inset-top), 3.5rem)" }}
+          style={{ paddingTop: "max(env(safe-area-inset-top), 72px)" }}
         >
           <CheckCircle className="w-16 h-16 text-green-500 mb-4" />
           <h1 className="text-3xl font-black mb-2">Submission Received!</h1>
@@ -78,7 +77,7 @@ export default function ContestPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+
 
       <div
         className="max-w-lg mx-auto px-4 pb-16"

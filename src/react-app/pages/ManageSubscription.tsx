@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useUser } from "@clerk/clerk-react";
-import Navbar from "@/react-app/components/Navbar";
 import { apiFetch } from "@/react-app/utils/api";
 
 export default function ManageSubscriptionPage() {
@@ -28,7 +27,7 @@ export default function ManageSubscriptionPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-red-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />

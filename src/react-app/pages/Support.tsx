@@ -1,4 +1,3 @@
-import Navbar from "@/react-app/components/Navbar";
 import { Link } from "react-router";
 import { Mail, MessageCircle, Film } from "lucide-react";
 
@@ -32,7 +31,7 @@ export default function SupportPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+
 
       <div
         className="max-w-2xl mx-auto px-4 pb-16"

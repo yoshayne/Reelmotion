@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router";
-import Navbar from "@/react-app/components/Navbar";
 import { useAdminRole } from "@/react-app/hooks/useAdminRole";
 import { apiFetch, apiFetchForm } from "@/react-app/utils/api";
 import type { CarouselItem } from "@/shared/types";
@@ -65,7 +64,7 @@ export default function AdminCarouselForm() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+
       <div className="max-w-lg mx-auto px-4 pb-16" style={{ paddingTop: "calc(max(env(safe-area-inset-top), 0px) + 5rem)" }}>
         <Link to="/admin/carousel" className="text-sm text-gray-500 hover:text-gray-400 mb-4 inline-block">← Carousel</Link>
         <h1 className="text-2xl font-black mb-6">{isNew ? "Add Carousel Item" : "Edit Carousel Item"}</h1>

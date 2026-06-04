@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router";
-import Navbar from "@/react-app/components/Navbar";
 import { useAdminRole } from "@/react-app/hooks/useAdminRole";
 import { apiFetch, apiFetchForm } from "@/react-app/utils/api";
 import type { Series, Category } from "@/shared/types";
@@ -76,7 +75,7 @@ export default function AdminSeriesForm() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+
       <div className="max-w-2xl mx-auto px-4 pb-16" style={{ paddingTop: "calc(max(env(safe-area-inset-top), 0px) + 5rem)" }}>
         <Link to="/admin/series" className="text-sm text-gray-500 hover:text-gray-400 mb-4 inline-block">← Series</Link>
         <h1 className="text-2xl font-black mb-6">{isNew ? "Add Series" : "Edit Series"}</h1>

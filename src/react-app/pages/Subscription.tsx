@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router";
 import { useUser } from "@clerk/clerk-react";
-import Navbar from "@/react-app/components/Navbar";
 import { apiFetch } from "@/react-app/utils/api";
 import { hasAccess } from "@/react-app/utils/access";
 import type { Subscription } from "@/shared/types";
@@ -46,7 +45,7 @@ export default function SubscriptionPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+
       <div
         className="max-w-lg mx-auto px-4 pb-16"
         style={{ paddingTop: "calc(max(env(safe-area-inset-top), 0px) + 5rem)" }}

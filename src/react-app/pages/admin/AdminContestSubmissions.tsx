@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import Navbar from "@/react-app/components/Navbar";
 import { useAdminRole } from "@/react-app/hooks/useAdminRole";
 import { apiFetch } from "@/react-app/utils/api";
 import type { ContestSubmission } from "@/shared/types";
@@ -49,7 +48,7 @@ export default function AdminContestSubmissions() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+
       <div className="max-w-5xl mx-auto px-4 pb-16" style={{ paddingTop: "calc(max(env(safe-area-inset-top), 0px) + 5rem)" }}>
         <div className="mb-6">
           <Link to="/admin" className="text-sm text-gray-500 hover:text-gray-400">← Admin</Link>

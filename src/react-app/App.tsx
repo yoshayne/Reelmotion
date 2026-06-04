@@ -36,7 +36,12 @@ import ContestTerms from "@/react-app/pages/ContestTerms";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const hideNav = location.pathname === "/" || location.pathname === "/auth-callback";
+  const hideNav =
+    location.pathname === "/" ||
+    location.pathname === "/auth-callback" ||
+    location.pathname.startsWith("/watch/") ||
+    location.pathname === "/account" ||
+    location.pathname === "/subscribe";
   return (
     <>
       {!hideNav && <Navbar />}

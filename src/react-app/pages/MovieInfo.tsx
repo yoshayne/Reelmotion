@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { useUser } from "@clerk/clerk-react";
-import Navbar from "@/react-app/components/Navbar";
 import { apiFetch } from "@/react-app/utils/api";
 import { hasAccess } from "@/react-app/utils/access";
 import type { Video, Subscription } from "@/shared/types";
@@ -73,7 +72,7 @@ export default function MovieInfo() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+
 
       {/* Hero */}
       <div className="relative h-64 md:h-[50vh] overflow-hidden">
@@ -91,7 +90,7 @@ export default function MovieInfo() {
         <button
           onClick={() => navigate(-1)}
           className="absolute top-4 left-4 flex items-center gap-1 text-sm text-gray-300 hover:text-white transition-colors"
-          style={{ marginTop: "max(env(safe-area-inset-top), 56px)" }}
+          style={{ marginTop: "max(env(safe-area-inset-top), 72px)" }}
         >
           <ChevronLeft className="w-4 h-4" /> Back
         </button>

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import Navbar from "@/react-app/components/Navbar";
 import { CheckCircle, Film, Users, Zap, Heart } from "lucide-react";
 
 export default function BillingSuccessPage() {
@@ -31,11 +30,11 @@ export default function BillingSuccessPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+
 
       <div
         className="flex flex-col items-center justify-center min-h-screen px-4 text-center"
-        style={{ paddingTop: "max(env(safe-area-inset-top), 3.5rem)" }}
+        style={{ paddingTop: "max(env(safe-area-inset-top), 72px)" }}
       >
         <div className="w-20 h-20 bg-green-600/20 rounded-full flex items-center justify-center mb-6">
           <CheckCircle className="w-10 h-10 text-green-500" />

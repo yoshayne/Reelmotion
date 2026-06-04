@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import Navbar from "@/react-app/components/Navbar";
 import { Film, ExternalLink } from "lucide-react";
 
 interface CoverArt {
@@ -23,7 +22,7 @@ export default function EPKPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+
 
       <div
         className="max-w-5xl mx-auto px-4 pb-16"
