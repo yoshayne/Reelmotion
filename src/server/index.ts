@@ -43,27 +43,34 @@ app.post("/api/webhooks/clerk", async (c) => {
       (e) => e.id === data.primary_email_address_id
     )?.email_address;
 
+    const ADMIN_EMAILS = ["romediastudios@gmail.com"];
+    const role = ADMIN_EMAILS.includes(primaryEmail ?? "") ? "admin" : "viewer";
+
     if (type === "user.created") {
       await query(
-        `INSERT INTO users (clerk_user_id, email, display_name, avatar_url)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (clerk_user_id) DO NOTHING`,
+        `INSERT INTO users (clerk_user_id, email, role, display_name, avatar_url)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (clerk_user_id) DO UPDATE SET role = $3`,
         [
           data.id,
           primaryEmail,
+          role,
           [data.first_name, data.last_name].filter(Boolean).join(" ") || null,
           data.image_url,
         ]
       );
     } else if (type === "user.updated") {
       await query(
-        `UPDATE users SET email = $2, display_name = $3, avatar_url = $4, updated_at = NOW()
+        `UPDATE users SET email = $2, role = CASE WHEN email = ANY($6::text[]) THEN 'admin' ELSE role END,
+         display_name = $3, avatar_url = $4, updated_at = NOW()
          WHERE clerk_user_id = $1`,
         [
           data.id,
           primaryEmail,
           [data.first_name, data.last_name].filter(Boolean).join(" ") || null,
           data.image_url,
+          null,
+          ADMIN_EMAILS,
         ]
       );
       await invalidateCache(`user:${data.id}`);
@@ -524,6 +531,9 @@ app.post("/api/playback-history", clerkAuth, async (c) => {
 // Billing
 app.get("/api/billing/subscription", clerkAuth, async (c) => {
   const user = c.get("user");
+  if (user.role === "admin" || user.role === "creator") {
+    return c.json({ plan: "yearly", status: "active", period_end_date: "2099-12-31" });
+  }
   const data = await getCached(`subscription:${user.id}`, 120, async () => {
     const result = await query(
       "SELECT * FROM subscriptions WHERE user_id = $1",
@@ -902,6 +912,13 @@ app.get("/*", async (c) => {
     (await import("node:fs")).readFileSync("./dist/client/index.html", "utf-8")
   );
 });
+
+// ─── Ensure admin accounts have correct role on boot ────────────────────────
+const ADMIN_EMAILS = ["romediastudios@gmail.com"];
+query(
+  `UPDATE users SET role = 'admin' WHERE email = ANY($1::text[]) AND role != 'admin'`,
+  [ADMIN_EMAILS]
+).catch(() => {});
 
 // ─── Start server ────────────────────────────────────────────────────────────
 const port = Number(process.env.PORT) || 3000;

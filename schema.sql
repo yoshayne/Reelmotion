@@ -208,4 +208,3 @@ CREATE TABLE IF NOT EXISTS subscription_attempts (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_subscription_attempts_email ON subscription_attempts(email);
-CREATE INDEX IF NOT EXISTS idx_subscription_attempts_status ON subscription_attempts(status);
