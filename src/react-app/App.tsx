@@ -1,6 +1,8 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router";
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router";
 import { ErrorBoundary } from "@/react-app/components/ErrorBoundary";
 import { InstallPrompt } from "@/react-app/components/InstallPrompt";
+import Navbar from "@/react-app/components/Navbar";
 import LandingPage from "@/react-app/pages/Landing";
 import BrowsePage from "@/react-app/pages/Browse";
 import WatchPage from "@/react-app/pages/Watch";
@@ -32,11 +34,23 @@ import Support from "@/react-app/pages/Support";
 import Contest from "@/react-app/pages/Contest";
 import ContestTerms from "@/react-app/pages/ContestTerms";
 
+function Layout({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const hideNav = location.pathname === "/" || location.pathname === "/auth-callback";
+  return (
+    <>
+      {!hideNav && <Navbar />}
+      {children}
+    </>
+  );
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
       <Router>
         <InstallPrompt />
+        <Layout>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/browse" element={<BrowsePage />} />
@@ -72,6 +86,7 @@ export default function App() {
           <Route path="/contest" element={<Contest />} />
           <Route path="/contest/terms" element={<ContestTerms />} />
         </Routes>
+        </Layout>
       </Router>
     </ErrorBoundary>
   );
