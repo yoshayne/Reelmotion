@@ -9,7 +9,8 @@ export function useAdminRole() {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    if (!isLoaded || !user) {
+    if (!isLoaded) return; // still loading — keep isChecking true
+    if (!user) {
       setIsChecking(false);
       return;
     }
