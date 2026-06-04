@@ -359,6 +359,8 @@ app.get("/api/brand-assets/public", async (c) => {
   }
   return c.json(assets);
 });
+
+app.post("/api/contest", async (c) => {
   const body = await c.req.json<{
     film_title: string;
     runtime: string;
