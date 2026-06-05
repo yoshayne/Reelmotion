@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router";
-import { useUser, useClerk } from "@clerk/clerk-react";
+import { Link, useNavigate } from "react-router";
+import { useUser } from "@clerk/clerk-react";
 import { apiFetch } from "@/react-app/utils/api";
 import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
 import { Check, Film, Users, Zap, Heart, Crown } from "lucide-react";
@@ -8,14 +8,14 @@ import { Check, Film, Users, Zap, Heart, Crown } from "lucide-react";
 export default function SubscribePage() {
   const { user, isLoaded } = useUser();
   const { logo, tagline } = useBrandAssets();
-  const { openSignIn } = useClerk();
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<"monthly" | "yearly">("yearly");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubscribe = async () => {
     if (!user) {
-      openSignIn({ redirectUrl: "/subscribe" });
+      navigate("/");
       return;
     }
     setLoading(true);
