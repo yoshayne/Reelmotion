@@ -10,7 +10,7 @@ type TabType = "all" | "new" | "series" | "movies" | "clips";
 
 export default function Browse() {
   const navigate = useNavigate();
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded, user } = useUser();
   const [browseData, setBrowseData] = useState<BrowseData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("all");
@@ -31,6 +31,11 @@ export default function Browse() {
     // Without this, apiFetch sends no token, gets 401, and catches return [].
     if (!isLoaded) return;
 
+    // Reset user-specific state before fetching so stale data from a previous
+    // session never bleeds through when a different user logs in
+    setContinueWatching([]);
+    setWatchlist(new Set());
+
     Promise.all([
       apiFetch("/api/browse-data").then(r => r.json()),
       apiFetch("/api/promo-popup").then(r => r.json()).catch(() => null),
@@ -47,7 +52,8 @@ export default function Browse() {
         setContinueWatching(history.slice(0, 10));
       }
     }).catch(console.error).finally(() => setLoading(false));
-  }, [isLoaded, isSignedIn]);
+  // user.id ensures a re-login by a different account refetches the correct data
+  }, [isLoaded, isSignedIn, user?.id]);
 
   useEffect(() => {
     if (!browseData?.carousel?.length) return;
