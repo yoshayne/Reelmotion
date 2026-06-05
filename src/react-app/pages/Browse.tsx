@@ -40,19 +40,10 @@ export default function Browse() {
       }
       if (wl?.items) setWatchlist(new Set(wl.items.map((i: any) => i.video_id)));
       if (wl && Array.isArray(wl)) setWatchlist(new Set((wl as any[]).map((i: any) => i.video_id || i.id)));
-      if (Array.isArray(history) && Array.isArray(data?.videos)) {
-        const cw = history
-          .filter((h: any) => h.last_position_seconds > 5)
-          .map((h: any) => {
-            const video = data.videos.find((v: Video) => v.id === h.video_id);
-            if (!video) return null;
-            // h comes from playback-history which joins videos — use h.mux_duration
-            // so the progress bar has a denominator even if browse-data video lacks it
-            return { ...video, mux_duration: h.mux_duration ?? video.mux_duration, last_position_seconds: h.last_position_seconds };
-          })
-          .filter(Boolean)
-          .slice(0, 10);
-        setContinueWatching(cw);
+      // history rows already contain all needed fields from the server JOIN —
+      // no need to cross-reference data.videos (which could miss unpublished videos)
+      if (Array.isArray(history) && history.length > 0) {
+        setContinueWatching(history.slice(0, 10));
       }
     }).catch(console.error).finally(() => setLoading(false));
   }, []);

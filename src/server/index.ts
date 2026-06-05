@@ -532,10 +532,11 @@ app.delete("/api/watchlist/:videoId", clerkAuth, async (c) => {
 app.get("/api/playback-history", clerkAuth, async (c) => {
   const user = c.get("user");
   const result = await query(
-    `SELECT ph.video_id, ph.last_position_seconds, ph.completed,
-            v.title, v.thumbnail_url, v.mux_duration, v.series_id, v.slug
+    `SELECT ph.video_id AS id, ph.video_id, ph.last_position_seconds, ph.completed,
+            v.title, v.thumbnail_url, v.mux_duration, v.series_id, v.slug,
+            v.episode_number, v.season_number
      FROM playback_history ph JOIN videos v ON ph.video_id = v.id
-     WHERE ph.user_id = $1
+     WHERE ph.user_id = $1 AND ph.completed = false AND ph.last_position_seconds > 5
      ORDER BY ph.updated_at DESC
      LIMIT 20`,
     [user.id]
