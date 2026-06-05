@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { useAdminRole } from "@/react-app/hooks/useAdminRole";
 import { apiFetch, apiFetchForm } from "@/react-app/utils/api";
 import type { PromoPopup } from "@/shared/types";
-import { Plus, Trash2, Eye, EyeOff, Upload, ImageIcon } from "lucide-react";
+import { Plus, Trash2, Eye, EyeOff, ImageIcon } from "lucide-react";
 
 interface VideoOption { id: number; title: string; }
 interface SeriesOption { id: number; title: string; }
