@@ -996,17 +996,31 @@ app.patch("/api/admin/promo-popups/:id", clerkAuth, adminAuth, async (c) => {
   const id = Number(c.req.param("id"));
   const body = await c.req.json<Record<string, unknown>>();
   const result = await query(
-    `UPDATE promo_popups SET title=COALESCE($1,title), image_key=COALESCE($2,image_key),
-      link_type=COALESCE($3,link_type), link_video_id=$4, link_series_id=$5,
-      link_custom_url=$6, frequency=COALESCE($7,frequency), is_active=COALESCE($8,is_active),
-      start_date=$9, end_date=$10, updated_at=NOW()
-     WHERE id=$11 RETURNING *`,
+    `UPDATE promo_popups
+     SET title = CASE WHEN $1::text IS NOT NULL THEN $1::text ELSE title END,
+         image_key = CASE WHEN $2::text IS NOT NULL THEN $2::text ELSE image_key END,
+         link_type = $3::text,
+         link_video_id = $4::integer,
+         link_series_id = $5::integer,
+         link_custom_url = $6::text,
+         frequency = CASE WHEN $7::text IS NOT NULL THEN $7::text ELSE frequency END,
+         is_active = CASE WHEN $8::boolean IS NOT NULL THEN $8::boolean ELSE is_active END,
+         updated_at = NOW()
+     WHERE id = $9
+     RETURNING *`,
     [
-      body.title, body.image_key, body.link_type, body.link_video_id,
-      body.link_series_id, body.link_custom_url, body.frequency,
-      body.is_active, body.start_date, body.end_date, id,
+      body.title ?? null,
+      body.image_key ?? null,
+      body.link_type ?? null,
+      body.link_video_id ?? null,
+      body.link_series_id ?? null,
+      body.link_custom_url ?? null,
+      body.frequency ?? null,
+      body.is_active ?? null,
+      id,
     ]
   );
+  if (!result.rows[0]) return c.json({ error: "Not found" }, 404);
   return c.json(result.rows[0]);
 });
 
