@@ -193,6 +193,21 @@ export async function runMigrations() {
     )
   `);
 
+  await query(`
+    CREATE TABLE IF NOT EXISTS subscription_attempts (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      email TEXT,
+      billing_period TEXT,
+      status TEXT NOT NULL DEFAULT 'started',
+      stripe_session_id TEXT,
+      checkout_started_at TIMESTAMPTZ,
+      completed_at TIMESTAMPTZ,
+      abandoned_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
   // Additive migrations: add missing columns to tables that already exist
   const alterations = [
     `ALTER TABLE series ADD COLUMN IF NOT EXISTS slug TEXT`,

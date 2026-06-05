@@ -23,6 +23,7 @@ export default function AdminVideoForm() {
   const [series, setSeries] = useState<Series[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [uploadingThumb, setUploadingThumb] = useState(false);
   const [uploadingHero, setUploadingHero] = useState(false);
 
@@ -61,22 +62,38 @@ export default function AdminVideoForm() {
     if (!file) return;
     const setter = field === "thumbnail_url" ? setUploadingThumb : setUploadingHero;
     setter(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await apiFetchForm("/api/admin/upload-image", fd);
-    const data = await res.json() as { url: string };
-    setForm((prev) => ({ ...prev, [field]: data.url }));
-    setter(false);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await apiFetchForm("/api/admin/upload-image", fd);
+      if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+      const data = await res.json() as { url: string };
+      setForm((prev) => ({ ...prev, [field]: data.url }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setter(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    const method = isNew ? "POST" : "PUT";
-    const url = isNew ? "/api/admin/videos" : `/api/admin/videos/${id}`;
-    await apiFetch(url, { method, body: JSON.stringify(form) });
-    setSaving(false);
-    navigate("/admin/videos");
+    setError(null);
+    try {
+      const method = isNew ? "POST" : "PUT";
+      const url = isNew ? "/api/admin/videos" : `/api/admin/videos/${id}`;
+      const res = await apiFetch(url, { method, body: JSON.stringify(form) });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? `Server error ${res.status}`);
+      }
+      navigate("/admin/videos");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+      setSaving(false);
+    }
   };
 
   const generateSlug = () => {
@@ -283,6 +300,9 @@ export default function AdminVideoForm() {
             </label>
           </div>
 
+          {error && (
+            <div className="p-3 rounded-xl text-sm text-red-400 border border-red-900 bg-red-950/40">{error}</div>
+          )}
           <div className="flex gap-3 pt-4">
             <Link
               to="/admin/videos"

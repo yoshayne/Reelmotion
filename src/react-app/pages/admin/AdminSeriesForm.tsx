@@ -18,6 +18,7 @@ export default function AdminSeriesForm() {
   });
   const [categories, setCategories] = useState<Category[]>([]);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isChecking && !isCreator) navigate("/browse");
@@ -41,11 +42,17 @@ export default function AdminSeriesForm() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: keyof SeriesFormData) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await apiFetchForm("/api/admin/upload-image", fd);
-    const data = await res.json() as { url: string };
-    setForm((prev) => ({ ...prev, [field]: data.url }));
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await apiFetchForm("/api/admin/upload-image", fd);
+      if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+      const data = await res.json() as { url: string };
+      setForm((prev) => ({ ...prev, [field]: data.url }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    }
   };
 
   const generateSlug = () => {
@@ -58,11 +65,20 @@ export default function AdminSeriesForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    const method = isNew ? "POST" : "PUT";
-    const url = isNew ? "/api/admin/series" : `/api/admin/series/${id}`;
-    await apiFetch(url, { method, body: JSON.stringify(form) });
-    setSaving(false);
-    navigate("/admin/series");
+    setError(null);
+    try {
+      const method = isNew ? "POST" : "PUT";
+      const url = isNew ? "/api/admin/series" : `/api/admin/series/${id}`;
+      const res = await apiFetch(url, { method, body: JSON.stringify(form) });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? `Server error ${res.status}`);
+      }
+      navigate("/admin/series");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+      setSaving(false);
+    }
   };
 
   if (isChecking) return null;
@@ -143,6 +159,9 @@ export default function AdminSeriesForm() {
               </div>
             ))}
           </div>
+          {error && (
+            <div className="p-3 rounded-xl text-sm text-red-400 border border-red-900 bg-red-950/40">{error}</div>
+          )}
           <div className="flex gap-3 pt-4">
             <Link to="/admin/series" className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-center text-sm font-medium">Cancel</Link>
             <button type="submit" disabled={saving}

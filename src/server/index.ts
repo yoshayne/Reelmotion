@@ -357,17 +357,24 @@ app.get("/api/promo-popup", async (c) => {
   return c.json(result.rows[0] || null);
 });
 
-app.get("/api/images/:key", async (c) => {
-  const key = decodeURIComponent(c.req.param("key"));
-  const publicUrl = getPublicUrl(key);
-  return c.redirect(publicUrl);
+app.get("/api/images/*", async (c) => {
+  // Extract key from path — everything after /api/images/
+  const key = c.req.path.slice("/api/images/".length);
+  if (!key) return c.json({ error: "No key" }, 400);
+  try {
+    // Use signed URL so it works whether bucket is public or private
+    const url = await getSignedDownloadUrl(decodeURIComponent(key));
+    return c.redirect(url, 302);
+  } catch {
+    return c.json({ error: "Not found" }, 404);
+  }
 });
 
 app.get("/api/brand-assets/public", async (c) => {
   const result = await query("SELECT name, file_key FROM brand_assets ORDER BY created_at ASC");
   const assets: Record<string, string> = {};
   for (const row of result.rows) {
-    assets[row.name] = getPublicUrl(row.file_key);
+    assets[row.name] = `/api/images/${encodeURIComponent(row.file_key)}`;
   }
   return c.json(assets);
 });
@@ -788,13 +795,15 @@ app.post("/api/admin/upload-image", clerkAuth, adminAuth, async (c) => {
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const key = await uploadFile(buffer, file.name, file.type, folder);
-  const url = getPublicUrl(key);
+  // Always return proxy URL — works whether bucket is public or private
+  const url = `/api/images/${encodeURIComponent(key)}`;
 
   if (folder === "brand") {
     const name = (formData.get("name") as string) || file.name;
     await query(
       `INSERT INTO brand_assets (name, file_key, content_type, file_size)
-       VALUES ($1, $2, $3, $4)`,
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (name) DO UPDATE SET file_key=$2, content_type=$3, file_size=$4, updated_at=NOW()`,
       [name, key, file.type, file.size]
     );
   }

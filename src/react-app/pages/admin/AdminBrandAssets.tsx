@@ -81,7 +81,7 @@ export default function AdminBrandAssets() {
               <div className="aspect-video bg-gray-800 flex items-center justify-center">
                 {asset.content_type?.startsWith("image/") ? (
                   <img
-                    src={`/api/images/${encodeURIComponent(asset.file_key)}`}
+                    src={`/api/images/${asset.file_key}`}
                     alt={asset.name}
                     className="w-full h-full object-contain"
                   />
