@@ -644,7 +644,7 @@ app.post("/api/admin/videos", clerkAuth, adminAuth, async (c) => {
       `INSERT INTO videos (title, slug, description, content_type, mux_asset_id, mux_playback_id,
         mux_duration, thumbnail_url, hero_image_url, carousel_image_url, category_id, series_id,
         episode_number, season_number, is_published, is_free, release_date,
-        intro_start_seconds, intro_end_seconds, content_rating, genre, cast, director,
+        intro_start_seconds, intro_end_seconds, content_rating, genre, "cast", director,
         created_by_user_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
        RETURNING *`,
@@ -676,7 +676,7 @@ app.put("/api/admin/videos/:id", clerkAuth, adminAuth, async (c) => {
         carousel_image_url=$10, category_id=$11, series_id=$12, episode_number=$13,
         season_number=$14, is_published=$15, is_free=$16, release_date=$17,
         intro_start_seconds=$18, intro_end_seconds=$19, content_rating=$20,
-        genre=$21, cast=$22, director=$23, updated_at=NOW()
+        genre=$21, "cast"=$22, director=$23, updated_at=NOW()
        WHERE id=$24 RETURNING *`,
       [
         body.title, body.slug || null, body.description || null, body.content_type,
@@ -725,7 +725,7 @@ app.post("/api/admin/series", clerkAuth, adminAuth, async (c) => {
   try {
     const result = await query(
       `INSERT INTO series (title, slug, description, cover_image_url, carousel_image_url,
-        hero_image_url, release_date, cast, director, content_rating, category_id, created_by_user_id)
+        hero_image_url, release_date, "cast", director, content_rating, category_id, created_by_user_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [
         body.title, body.slug || null, body.description || null, body.cover_image_url || null,
@@ -748,7 +748,7 @@ app.put("/api/admin/series/:id", clerkAuth, adminAuth, async (c) => {
   try {
     const result = await query(
       `UPDATE series SET title=$1, slug=$2, description=$3, cover_image_url=$4,
-        carousel_image_url=$5, hero_image_url=$6, release_date=$7, cast=$8,
+        carousel_image_url=$5, hero_image_url=$6, release_date=$7, "cast"=$8,
         director=$9, content_rating=$10, category_id=$11, updated_at=NOW()
        WHERE id=$12 RETURNING *`,
       [
