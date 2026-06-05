@@ -1016,14 +1016,6 @@ app.delete("/api/admin/promo-popups/:id", clerkAuth, adminAuth, async (c) => {
   return c.json({ success: true });
 });
 
-// ─── SPA fallback ────────────────────────────────────────────────────────────
-app.use("/*", serveStatic({ root: "./dist/client" }));
-app.get("/*", async (c) => {
-  return c.html(
-    (await import("node:fs")).readFileSync("./dist/client/index.html", "utf-8")
-  );
-});
-
 // ─── Comments ────────────────────────────────────────────────────────────────
 
 // GET /api/videos/:id/comments — public, paginated (optionally authenticated to resolve is_owner)
@@ -1133,6 +1125,14 @@ app.get("/api/admin/comments", clerkAuth, adminAuth, async (c) => {
      LIMIT 500`
   );
   return c.json(result.rows);
+});
+
+// ─── SPA fallback ────────────────────────────────────────────────────────────
+app.use("/*", serveStatic({ root: "./dist/client" }));
+app.get("/*", async (c) => {
+  return c.html(
+    (await import("node:fs")).readFileSync("./dist/client/index.html", "utf-8")
+  );
 });
 
 // ─── Start server ────────────────────────────────────────────────────────────
