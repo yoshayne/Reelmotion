@@ -65,7 +65,7 @@ export default function Landing() {
               style={{ background: 'linear-gradient(to right, transparent, rgba(245,158,11,0.3), transparent)' }}
             />
             <h2 className="text-xl font-bold text-center mb-2">Join the Community</h2>
-            <p className="text-sm text-zinc-400 text-center mb-6">Stream exclusive Black culture content</p>
+            <p className="text-sm text-zinc-400 text-center mb-6">Become the Culture</p>
 
             {/* Google button */}
             <button

@@ -68,7 +68,7 @@ export default function SubscribePage() {
             Join the <span style={{ color: '#E8001D' }}>Community</span>
           </h1>
           <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
-            Watch The Culture — unlimited access to independent film
+            Become the Culture — unlimited access to independent film
           </p>
         </div>
 
