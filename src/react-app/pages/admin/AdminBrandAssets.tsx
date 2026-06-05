@@ -79,7 +79,7 @@ export default function AdminBrandAssets() {
           {assets.map((asset) => (
             <div key={asset.id} className="bg-gray-900/50 border border-gray-800 rounded-xl overflow-hidden">
               <div className="aspect-video bg-gray-800 flex items-center justify-center">
-                {asset.content_type.startsWith("image/") ? (
+                {asset.content_type?.startsWith("image/") ? (
                   <img
                     src={`/api/images/${encodeURIComponent(asset.file_key)}`}
                     alt={asset.name}
