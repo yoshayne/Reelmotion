@@ -19,8 +19,8 @@ export default function AdminVideos() {
   useEffect(() => {
     if (!isCreator) return;
     apiFetch("/api/admin/videos")
-      .then((r) => r.json() as Promise<Video[]>)
-      .then(setVideos)
+      .then((r) => r.json())
+      .then((data) => setVideos(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
   }, [isCreator]);
 

@@ -623,14 +623,18 @@ app.post("/api/billing/create-portal-session", clerkAuth, async (c) => {
 
 // Videos
 app.get("/api/admin/videos", clerkAuth, adminAuth, async (c) => {
-  const result = await query(
-    `SELECT v.*, s.title as series_title, c.name as category_name
-     FROM videos v
-     LEFT JOIN series s ON v.series_id = s.id
-     LEFT JOIN categories c ON v.category_id = c.id
-     ORDER BY v.created_at DESC`
-  );
-  return c.json(result.rows);
+  try {
+    const result = await query(
+      `SELECT v.*, s.title as series_title
+       FROM videos v
+       LEFT JOIN series s ON v.series_id = s.id
+       ORDER BY v.created_at DESC`
+    );
+    return c.json(result.rows);
+  } catch (err) {
+    console.error("GET /api/admin/videos error:", err);
+    return c.json([]);
+  }
 });
 
 app.post("/api/admin/videos", clerkAuth, adminAuth, async (c) => {
@@ -702,13 +706,18 @@ app.delete("/api/admin/videos/:id", clerkAuth, adminAuth, async (c) => {
 
 // Series
 app.get("/api/admin/series", clerkAuth, adminAuth, async (c) => {
-  const result = await query(
-    `SELECT s.*, c.name as category_name,
-     (SELECT COUNT(*) FROM videos v WHERE v.series_id = s.id) as episode_count
-     FROM series s LEFT JOIN categories c ON s.category_id = c.id
-     ORDER BY s.created_at DESC`
-  );
-  return c.json(result.rows);
+  try {
+    const result = await query(
+      `SELECT s.*,
+       (SELECT COUNT(*) FROM videos v WHERE v.series_id = s.id) as episode_count
+       FROM series s
+       ORDER BY s.created_at DESC`
+    );
+    return c.json(result.rows);
+  } catch (err) {
+    console.error("GET /api/admin/series error:", err);
+    return c.json([]);
+  }
 });
 
 app.post("/api/admin/series", clerkAuth, adminAuth, async (c) => {

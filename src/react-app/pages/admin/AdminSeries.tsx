@@ -18,8 +18,8 @@ export default function AdminSeries() {
   useEffect(() => {
     if (!isCreator) return;
     apiFetch("/api/admin/series")
-      .then((r) => r.json() as Promise<Series[]>)
-      .then(setSeries)
+      .then((r) => r.json())
+      .then((data) => setSeries(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
   }, [isCreator]);
 
