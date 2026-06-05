@@ -259,9 +259,9 @@ export default function Browse() {
                     ) : (
                       <div className="w-full h-full bg-zinc-900" />
                     )}
-                    {item.last_position_seconds && item.mux_duration && (
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/20">
-                        <div className="h-full" style={{ width: `${Math.min(100, (item.last_position_seconds / item.mux_duration) * 100)}%`, backgroundColor: '#E8001D' }} />
+                    {item.last_position_seconds > 0 && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+                        <div className="h-full" style={{ width: `${item.mux_duration ? Math.min(100, (item.last_position_seconds / item.mux_duration) * 100) : 0}%`, backgroundColor: '#E8001D' }} />
                       </div>
                     )}
                     {item.episode_number && (
