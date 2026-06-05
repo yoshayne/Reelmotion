@@ -16,7 +16,7 @@ export default function Landing() {
   const handleGoogleSignIn = () => {
     signIn?.authenticateWithRedirect({
       strategy: "oauth_google",
-      redirectUrl: "/auth-callback",
+      redirectUrl: "/sso-callback",
       redirectUrlComplete: "/browse",
     });
   };

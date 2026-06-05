@@ -33,12 +33,14 @@ import EPK from "@/react-app/pages/EPK";
 import Support from "@/react-app/pages/Support";
 import Contest from "@/react-app/pages/Contest";
 import ContestTerms from "@/react-app/pages/ContestTerms";
+import SSOCallback from "@/react-app/pages/SSOCallback";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const hideNav =
     location.pathname === "/" ||
     location.pathname === "/auth-callback" ||
+    location.pathname === "/sso-callback" ||
     location.pathname.startsWith("/watch/") ||
     location.pathname === "/account" ||
     location.pathname === "/subscribe";
@@ -90,6 +92,8 @@ export default function App() {
           <Route path="/support" element={<Support />} />
           <Route path="/contest" element={<Contest />} />
           <Route path="/contest/terms" element={<ContestTerms />} />
+          <Route path="/sso-callback" element={<SSOCallback />} />
+          <Route path="/auth-callback" element={<SSOCallback />} />
         </Routes>
         </Layout>
       </Router>
