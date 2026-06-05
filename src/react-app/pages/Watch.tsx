@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { useUser } from "@clerk/clerk-react";
 import MuxPlayerWrapper from "@/react-app/components/MuxPlayerWrapper";
@@ -24,6 +24,7 @@ export default function WatchPage() {
   const [startTime, setStartTime] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const lastSavedRef = useRef<number>(0);
 
   useEffect(() => {
     if (!id) return;
@@ -54,10 +55,15 @@ export default function WatchPage() {
   const handleTimeUpdate = useCallback(
     (time: number) => {
       if (!user || !watchData) return;
+      // Save at most once every 15 seconds to avoid hammering the DB
+      const now = Date.now();
+      if (now - lastSavedRef.current < 15_000) return;
+      lastSavedRef.current = now;
       const duration = watchData.video.mux_duration ?? 0;
       const completed = duration > 0 && time / duration > 0.9;
       apiFetch("/api/playback-history", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ video_id: watchData.video.id, last_position_seconds: time, completed }),
       }).catch(() => {});
     },

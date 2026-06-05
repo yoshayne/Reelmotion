@@ -27,26 +27,27 @@ export default function Browse() {
   }, [isLoaded, isSignedIn, navigate]);
 
   useEffect(() => {
+    // Wait for Clerk to finish loading before fetching auth-gated endpoints.
+    // Without this, apiFetch sends no token, gets 401, and catches return [].
+    if (!isLoaded) return;
+
     Promise.all([
       apiFetch("/api/browse-data").then(r => r.json()),
       apiFetch("/api/promo-popup").then(r => r.json()).catch(() => null),
-      apiFetch("/api/watchlist").then(r => r.json()).catch(() => ({ items: [] })),
-      apiFetch("/api/playback-history").then(r => r.json()).catch(() => []),
+      isSignedIn ? apiFetch("/api/watchlist").then(r => r.json()).catch(() => []) : Promise.resolve([]),
+      isSignedIn ? apiFetch("/api/playback-history").then(r => r.json()).catch(() => []) : Promise.resolve([]),
     ]).then(([data, promo, wl, history]) => {
       setBrowseData(data);
       if (promo?.id) {
         setPromoPopup(promo);
         setShowPromo(true);
       }
-      if (wl?.items) setWatchlist(new Set(wl.items.map((i: any) => i.video_id)));
-      if (wl && Array.isArray(wl)) setWatchlist(new Set((wl as any[]).map((i: any) => i.video_id || i.id)));
-      // history rows already contain all needed fields from the server JOIN —
-      // no need to cross-reference data.videos (which could miss unpublished videos)
+      if (Array.isArray(wl)) setWatchlist(new Set((wl as any[]).map((i: any) => i.video_id || i.id)));
       if (Array.isArray(history) && history.length > 0) {
         setContinueWatching(history.slice(0, 10));
       }
     }).catch(console.error).finally(() => setLoading(false));
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   useEffect(() => {
     if (!browseData?.carousel?.length) return;
