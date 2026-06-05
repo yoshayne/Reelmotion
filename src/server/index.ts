@@ -361,12 +361,11 @@ app.get("/api/promo-popup", async (c) => {
 });
 
 app.get("/api/images/*", async (c) => {
-  // Extract key from path — everything after /api/images/
-  const key = c.req.path.slice("/api/images/".length);
-  if (!key) return c.json({ error: "No key" }, 400);
+  const raw = c.req.path.slice("/api/images/".length);
+  if (!raw) return c.json({ error: "No key" }, 400);
+  const key = decodeURIComponent(raw);
   try {
-    // Use signed URL so it works whether bucket is public or private
-    const url = await getSignedDownloadUrl(decodeURIComponent(key));
+    const url = await getSignedDownloadUrl(key);
     return c.redirect(url, 302);
   } catch {
     return c.json({ error: "Not found" }, 404);
@@ -377,7 +376,7 @@ app.get("/api/brand-assets/public", async (c) => {
   const result = await query("SELECT name, file_key FROM brand_assets ORDER BY created_at ASC");
   const assets: Record<string, string> = {};
   for (const row of result.rows) {
-    assets[row.name] = `/api/images/${encodeURIComponent(row.file_key)}`;
+    assets[row.name] = `/api/images/${row.file_key}`;
   }
   return c.json(assets);
 });
@@ -537,7 +536,7 @@ app.get("/api/playback-history", clerkAuth, async (c) => {
             v.title, v.thumbnail_url, v.mux_duration, v.series_id, v.slug
      FROM playback_history ph JOIN videos v ON ph.video_id = v.id
      WHERE ph.user_id = $1
-     ORDER BY ph.last_watched_at DESC
+     ORDER BY ph.updated_at DESC
      LIMIT 20`,
     [user.id]
   );
@@ -553,10 +552,10 @@ app.post("/api/playback-history", clerkAuth, async (c) => {
   }>();
 
   await query(
-    `INSERT INTO playback_history (user_id, video_id, last_position_seconds, completed, last_watched_at)
-     VALUES ($1, $2, $3, $4, NOW())
+    `INSERT INTO playback_history (user_id, video_id, last_position_seconds, completed)
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT (user_id, video_id) DO UPDATE SET
-       last_position_seconds = $3, completed = $4, last_watched_at = NOW(), updated_at = NOW()`,
+       last_position_seconds = $3, completed = $4, updated_at = NOW()`,
     [user.id, body.video_id, body.last_position_seconds, body.completed ?? false]
   );
   return c.json({ success: true });
@@ -833,7 +832,7 @@ app.post("/api/admin/upload-image", clerkAuth, adminAuth, async (c) => {
   const buffer = Buffer.from(await file.arrayBuffer());
   const key = await uploadFile(buffer, file.name, file.type, folder);
   // Always return proxy URL — works whether bucket is public or private
-  const url = `/api/images/${encodeURIComponent(key)}`;
+  const url = `/api/images/${key}`;
 
   if (folder === "brand") {
     const name = (formData.get("name") as string) || file.name;

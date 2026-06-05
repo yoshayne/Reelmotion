@@ -26,6 +26,26 @@ export async function runMigrations() {
     )
   `);
 
+  // Seed default categories — ON CONFLICT keeps existing rows intact
+  const defaultCategories = [
+    { name: "Reality",       slug: "reality",       sort_order: 1 },
+    { name: "Drama",         slug: "drama",         sort_order: 2 },
+    { name: "Documentary",   slug: "documentary",   sort_order: 3 },
+    { name: "Comedy",        slug: "comedy",        sort_order: 4 },
+    { name: "Music",         slug: "music",         sort_order: 5 },
+    { name: "Short Film",    slug: "short-film",    sort_order: 6 },
+    { name: "Web Series",    slug: "web-series",    sort_order: 7 },
+    { name: "Behind the Scenes", slug: "behind-the-scenes", sort_order: 8 },
+  ];
+  for (const cat of defaultCategories) {
+    await query(
+      `INSERT INTO categories (name, slug, sort_order)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (slug) DO NOTHING`,
+      [cat.name, cat.slug, cat.sort_order]
+    );
+  }
+
   await query(`
     CREATE TABLE IF NOT EXISTS series (
       id SERIAL PRIMARY KEY,
