@@ -15,7 +15,7 @@ export default function AdminVideoForm() {
   const [form, setForm] = useState<VideoFormData>({
     title: "", slug: "", description: "", content_type: "movie",
     mux_asset_id: "", mux_playback_id: "", thumbnail_url: "", hero_image_url: "",
-    carousel_image_url: "", is_published: false, is_free: false,
+    carousel_image_url: "", is_published: false, is_free: false, subtitles_enabled: true,
     content_rating: "", genre: "", cast: "", director: "",
     episode_number: undefined, season_number: undefined,
     intro_start_seconds: undefined, intro_end_seconds: undefined,
@@ -297,6 +297,16 @@ export default function AdminVideoForm() {
                 className="w-4 h-4 accent-red-600"
               />
               <span className="text-sm">Free to watch</span>
+            </label>
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                name="subtitles_enabled"
+                checked={form.subtitles_enabled ?? true}
+                onChange={(e) => setForm((p) => ({ ...p, subtitles_enabled: e.target.checked }))}
+                className="w-4 h-4 accent-red-600"
+              />
+              <span className="text-sm">Subtitles / CC</span>
             </label>
           </div>
 

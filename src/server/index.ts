@@ -666,17 +666,17 @@ app.post("/api/admin/videos", clerkAuth, adminAuth, async (c) => {
     const result = await query(
       `INSERT INTO videos (title, slug, description, content_type, mux_asset_id, mux_playback_id,
         mux_duration, thumbnail_url, hero_image_url, carousel_image_url, category_id, series_id,
-        episode_number, season_number, is_published, is_free, release_date,
+        episode_number, season_number, is_published, is_free, subtitles_enabled, release_date,
         intro_start_seconds, intro_end_seconds, content_rating, genre, "cast", director,
         created_by_user_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
        RETURNING *`,
       [
         body.title, body.slug || null, body.description || null, body.content_type ?? "movie",
         body.mux_asset_id || null, body.mux_playback_id || null, body.mux_duration || null,
         body.thumbnail_url || null, body.hero_image_url || null, body.carousel_image_url || null,
         body.category_id || null, body.series_id || null, body.episode_number || null, body.season_number || null,
-        body.is_published ?? false, body.is_free ?? false, body.release_date || null,
+        body.is_published ?? false, body.is_free ?? false, body.subtitles_enabled ?? true, body.release_date || null,
         body.intro_start_seconds || null, body.intro_end_seconds || null, body.content_rating || null,
         body.genre || null, body.cast || null, body.director || null, user.id,
       ]
@@ -697,16 +697,16 @@ app.put("/api/admin/videos/:id", clerkAuth, adminAuth, async (c) => {
       `UPDATE videos SET title=$1, slug=$2, description=$3, content_type=$4, mux_asset_id=$5,
         mux_playback_id=$6, mux_duration=$7, thumbnail_url=$8, hero_image_url=$9,
         carousel_image_url=$10, category_id=$11, series_id=$12, episode_number=$13,
-        season_number=$14, is_published=$15, is_free=$16, release_date=$17,
-        intro_start_seconds=$18, intro_end_seconds=$19, content_rating=$20,
-        genre=$21, "cast"=$22, director=$23, updated_at=NOW()
-       WHERE id=$24 RETURNING *`,
+        season_number=$14, is_published=$15, is_free=$16, subtitles_enabled=$17, release_date=$18,
+        intro_start_seconds=$19, intro_end_seconds=$20, content_rating=$21,
+        genre=$22, "cast"=$23, director=$24, updated_at=NOW()
+       WHERE id=$25 RETURNING *`,
       [
         body.title, body.slug || null, body.description || null, body.content_type,
         body.mux_asset_id || null, body.mux_playback_id || null, body.mux_duration || null,
         body.thumbnail_url || null, body.hero_image_url || null, body.carousel_image_url || null,
         body.category_id || null, body.series_id || null, body.episode_number || null, body.season_number || null,
-        body.is_published ?? false, body.is_free ?? false, body.release_date || null,
+        body.is_published ?? false, body.is_free ?? false, body.subtitles_enabled ?? true, body.release_date || null,
         body.intro_start_seconds || null, body.intro_end_seconds || null, body.content_rating || null,
         body.genre || null, body.cast || null, body.director || null, id,
       ]

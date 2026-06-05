@@ -59,6 +59,7 @@ export interface Video {
   season_number: number | null;
   is_published: boolean;
   is_free: boolean;
+  subtitles_enabled: boolean;
   release_date: string | null;
   intro_start_seconds: number | null;
   intro_end_seconds: number | null;

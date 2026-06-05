@@ -248,6 +248,7 @@ export async function runMigrations() {
     `ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT false`,
     `ALTER TABLE videos ADD COLUMN IF NOT EXISTS category_id INTEGER`,
     `ALTER TABLE videos ADD COLUMN IF NOT EXISTS created_by_user_id INTEGER`,
+    `ALTER TABLE videos ADD COLUMN IF NOT EXISTS subtitles_enabled BOOLEAN DEFAULT true`,
     `ALTER TABLE carousel_items ADD COLUMN IF NOT EXISTS description TEXT`,
     `ALTER TABLE carousel_items ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`,
     `ALTER TABLE carousel_items ADD COLUMN IF NOT EXISTS series_id INTEGER`,

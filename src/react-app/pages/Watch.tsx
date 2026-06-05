@@ -141,6 +141,7 @@ export default function WatchPage() {
               onTimeUpdate={handleTimeUpdate}
               onEnded={() => { if (nextEpisode) navigate(`/watch/${nextEpisode.id}`); }}
               autoPlay={false}
+              subtitlesEnabled={video.subtitles_enabled ?? true}
             />
           ) : (
             <div className="relative flex flex-col items-center justify-center gap-4 px-4 py-16 bg-zinc-900">

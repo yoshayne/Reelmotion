@@ -7,6 +7,7 @@ interface MuxPlayerWrapperProps {
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   onEnded?: () => void;
   autoPlay?: boolean;
+  subtitlesEnabled?: boolean;
 }
 
 declare module "react" {
@@ -22,6 +23,8 @@ declare module "react" {
         controls?: boolean;
         style?: React.CSSProperties;
         ref?: React.Ref<HTMLElement & { currentTime: number; duration: number; paused: boolean; play: () => void; pause: () => void }>;
+        "default-hidden-captions"?: boolean;
+        "disable-tracking"?: boolean;
       }, HTMLElement>;
     }
   }
@@ -33,6 +36,7 @@ export default function MuxPlayerWrapper({
   onTimeUpdate,
   onEnded,
   autoPlay = false,
+  subtitlesEnabled = true,
 }: MuxPlayerWrapperProps) {
   const playerRef = useRef<HTMLElement & {
     currentTime: number;
@@ -121,6 +125,7 @@ export default function MuxPlayerWrapper({
         start-time={startTime}
         autoplay={autoPlay}
         controls
+        default-hidden-captions={!subtitlesEnabled}
         style={{ width: "100%", aspectRatio: "16/9", display: "block" }}
       />
 
