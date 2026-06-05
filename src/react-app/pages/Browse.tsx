@@ -174,7 +174,7 @@ export default function Browse() {
                   window.open(promoPopup.link_custom_url, "_blank", "noopener");
                 }
               };
-              const hasLink = promoPopup.link_type && promoPopup.link_type !== "none" && (
+              const hasLink = promoPopup.link_type && (
                 promoPopup.link_video_id || promoPopup.link_series_id || promoPopup.link_custom_url
               );
               return (
