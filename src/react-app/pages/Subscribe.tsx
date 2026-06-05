@@ -126,6 +126,7 @@ export default function SubscribePage() {
                   <span className="text-sm line-through" style={{ color: 'rgba(255,255,255,0.3)' }}>$49.99</span>
                 </div>
                 <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Billed once yearly · just $2.08/mo</p>
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.25)' }}>Early access pricing · subject to change</p>
               </div>
             </div>
             {selected === "yearly" && (
