@@ -46,7 +46,9 @@ export default function Browse() {
           .map((h: any) => {
             const video = data.videos.find((v: Video) => v.id === h.video_id);
             if (!video) return null;
-            return { ...video, last_position_seconds: h.last_position_seconds };
+            // h comes from playback-history which joins videos — use h.mux_duration
+            // so the progress bar has a denominator even if browse-data video lacks it
+            return { ...video, mux_duration: h.mux_duration ?? video.mux_duration, last_position_seconds: h.last_position_seconds };
           })
           .filter(Boolean)
           .slice(0, 10);
