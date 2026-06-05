@@ -163,9 +163,29 @@ export default function Browse() {
             <button onClick={() => setShowPromo(false)} className="absolute -top-3 -right-3 z-10 w-8 h-8 bg-black rounded-full flex items-center justify-center border border-white/20">
               <X className="w-4 h-4" />
             </button>
-            {promoPopup.image_key && (
-              <img src={`/api/images/${promoPopup.image_key}`} alt={promoPopup.title} className="w-full rounded-xl" />
-            )}
+            {promoPopup.image_key && (() => {
+              const handleClick = () => {
+                setShowPromo(false);
+                if (promoPopup.link_type === "video" && promoPopup.link_video_id) {
+                  navigate(`/watch/${promoPopup.link_video_id}`);
+                } else if (promoPopup.link_type === "series" && promoPopup.link_series_id) {
+                  navigate(`/series/${promoPopup.link_series_id}`);
+                } else if (promoPopup.link_type === "custom" && promoPopup.link_custom_url) {
+                  window.open(promoPopup.link_custom_url, "_blank", "noopener");
+                }
+              };
+              const hasLink = promoPopup.link_type && promoPopup.link_type !== "none" && (
+                promoPopup.link_video_id || promoPopup.link_series_id || promoPopup.link_custom_url
+              );
+              return (
+                <img
+                  src={`/api/images/${promoPopup.image_key}`}
+                  alt={promoPopup.title}
+                  onClick={hasLink ? handleClick : undefined}
+                  className={`w-full rounded-xl${hasLink ? " cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
+                />
+              );
+            })()}
           </div>
         </div>
       )}
