@@ -6,7 +6,7 @@ import { query, pool } from "./db.js";
 import { clerkAuth, adminAuth, clerk } from "./auth.js";
 import Stripe from "stripe";
 import { stripe, createCheckoutSession, createPortalSession } from "./stripe.js";
-import { uploadFile, getPublicUrl, getSignedDownloadUrl } from "./storage.js";
+import { uploadFile, getPublicUrl, getSignedDownloadUrl, listFiles } from "./storage.js";
 import { getCached, invalidateCache } from "./redis.js";
 import { runMigrations } from "./migrate.js";
 
@@ -373,11 +373,23 @@ app.get("/api/images/*", async (c) => {
 });
 
 app.get("/api/brand-assets/public", async (c) => {
-  const result = await query("SELECT name, file_key FROM brand_assets ORDER BY created_at ASC");
   const assets: Record<string, string> = {};
+
+  // First, pull anything uploaded directly to the brand/ folder in storage
+  // (files uploaded via Railway UI won't have DB records)
+  try {
+    const storageFiles = await listFiles("brand/");
+    for (const f of storageFiles) {
+      if (f.name) assets[f.name] = `/api/images/${f.key}`;
+    }
+  } catch { /* storage unavailable — continue */ }
+
+  // DB records override storage so renamed assets take precedence
+  const result = await query("SELECT name, file_key FROM brand_assets ORDER BY created_at ASC");
   for (const row of result.rows) {
     assets[row.name] = `/api/images/${row.file_key}`;
   }
+
   return c.json(assets);
 });
 
@@ -829,8 +841,29 @@ app.delete("/api/admin/carousel/:id", clerkAuth, adminAuth, async (c) => {
 
 // Brand Assets
 app.get("/api/admin/brand-assets", clerkAuth, adminAuth, async (c) => {
-  const result = await query("SELECT * FROM brand_assets ORDER BY created_at DESC");
-  return c.json(result.rows);
+  const dbResult = await query("SELECT * FROM brand_assets ORDER BY created_at DESC");
+  const dbKeys = new Set(dbResult.rows.map((r: any) => r.file_key));
+
+  // Also surface files in the brand/ folder that were uploaded directly to storage
+  const storageRows: any[] = [];
+  try {
+    const storageFiles = await listFiles("brand/");
+    for (const f of storageFiles) {
+      if (!dbKeys.has(f.key) && f.name) {
+        storageRows.push({
+          id: `storage-${f.key}`,
+          name: f.name,
+          file_key: f.key,
+          content_type: f.name.match(/\.png$/i) ? "image/png" : f.name.match(/\.jpe?g$/i) ? "image/jpeg" : "image/png",
+          file_size: null,
+          created_at: null,
+          updated_at: null,
+        });
+      }
+    }
+  } catch { /* storage unavailable */ }
+
+  return c.json([...storageRows, ...dbResult.rows]);
 });
 
 // Upload Image

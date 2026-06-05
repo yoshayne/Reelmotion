@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
 import path from "path";
@@ -77,4 +77,17 @@ export async function getSignedDownloadUrl(key: string, expiresIn = 3600): Promi
 export function getPublicUrl(key: string): string {
   const base = process.env.STORAGE_PUBLIC_URL || `${ENDPOINT}/${BUCKET}`;
   return `${base}/${key}`;
+}
+
+// List all keys under a folder prefix (e.g. "brand/")
+export async function listFiles(prefix: string): Promise<{ key: string; name: string }[]> {
+  const command = new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix });
+  const response = await s3.send(command);
+  return (response.Contents ?? [])
+    .filter(obj => obj.Key && obj.Key !== prefix)
+    .map(obj => ({
+      key: obj.Key!,
+      // Filename only — strip the folder prefix
+      name: obj.Key!.slice(prefix.length),
+    }));
 }
