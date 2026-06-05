@@ -5,24 +5,38 @@ interface BrandAssets {
   tagline: string;
 }
 
-const LOGO_NAMES = ["ReelMotion Logo TM.png", "ReelMotion Logo TM", "logo"];
-const TAGLINE_NAMES = ["Watch the culture tag.png", "Watch the culture tag", "tagline"];
-
-const FALLBACK_LOGO = "";
-const FALLBACK_TAGLINE = "";
+// Case-insensitive substring matching — finds assets regardless of exact name entered in admin
+function matchAsset(data: Record<string, string>, keywords: string[]): string {
+  const entries = Object.entries(data);
+  for (const kw of keywords) {
+    const found = entries.find(([name]) => name.toLowerCase().includes(kw.toLowerCase()));
+    if (found) return found[1];
+  }
+  return "";
+}
 
 let cachedAssets: BrandAssets | null = null;
 
+// Call this after uploading new brand assets so the next useBrandAssets call re-fetches
+export function invalidateBrandAssetsCache() {
+  cachedAssets = null;
+}
+
 export function useBrandAssets(): BrandAssets {
-  const [assets, setAssets] = useState<BrandAssets>(cachedAssets ?? { logo: FALLBACK_LOGO, tagline: FALLBACK_TAGLINE });
+  const [assets, setAssets] = useState<BrandAssets>(cachedAssets ?? { logo: "", tagline: "" });
 
   useEffect(() => {
-    if (cachedAssets) return;
+    if (cachedAssets) {
+      setAssets(cachedAssets);
+      return;
+    }
     fetch("/api/brand-assets/public")
       .then(r => r.json())
       .then((data: Record<string, string>) => {
-        const logo = LOGO_NAMES.map(n => data[n]).find(Boolean) ?? FALLBACK_LOGO;
-        const tagline = TAGLINE_NAMES.map(n => data[n]).find(Boolean) ?? FALLBACK_TAGLINE;
+        // Logo: look for "logo" or "reelmotion" in the asset name
+        const logo = matchAsset(data, ["logo", "reelmotion"]);
+        // Tagline: look for "culture", "tag", "tagline", or "watch the" in the asset name
+        const tagline = matchAsset(data, ["culture", "tagline", "tag", "watch the"]);
         cachedAssets = { logo, tagline };
         setAssets(cachedAssets);
       })

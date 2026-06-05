@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAdminRole } from "@/react-app/hooks/useAdminRole";
 import { apiFetch, apiFetchForm } from "@/react-app/utils/api";
+import { invalidateBrandAssetsCache } from "@/react-app/hooks/useBrandAssets";
 import type { BrandAsset } from "@/shared/types";
 import { Upload, Image } from "lucide-react";
 
@@ -40,6 +41,7 @@ export default function AdminBrandAssets() {
       file_key: data.key, content_type: file.type, file_size: file.size,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }]);
+    invalidateBrandAssetsCache();
     setAssetName("");
     setUploading(false);
   };
