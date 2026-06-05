@@ -12,6 +12,12 @@ import { runMigrations } from "./migrate.js";
 
 const app = new Hono();
 
+// ─── Global error handler — always return JSON ───────────────────────────────
+app.onError((err, c) => {
+  console.error(`[${c.req.method}] ${c.req.path}`, err);
+  return c.json({ error: err.message || "Internal server error" }, 500);
+});
+
 // ─── Static files ───────────────────────────────────────────────────────────
 app.use("/assets/*", serveStatic({ root: "./dist/client" }));
 app.use("/manifest.json", serveStatic({ root: "./dist/client" }));
@@ -242,36 +248,33 @@ app.get("/api/carousel", async (c) => {
 });
 
 app.get("/api/browse-data", async (c) => {
-  const data = await getCached("browse-data", 300, async () => {
-    const [videos, series, categories, carousel] = await Promise.all([
-      query(
-        `SELECT v.*, c.name as category_name
-         FROM videos v
-         LEFT JOIN categories c ON v.category_id = c.id
-         WHERE v.is_published = true
-         ORDER BY v.release_date DESC NULLS LAST, v.created_at DESC`
-      ),
-      query(
-        `SELECT s.*, c.name as category_name
-         FROM series s
-         LEFT JOIN categories c ON s.category_id = c.id
-         ORDER BY s.created_at DESC`
-      ),
-      query("SELECT * FROM categories ORDER BY sort_order ASC, name ASC"),
-      query(
-        "SELECT * FROM carousel_items WHERE is_active = true ORDER BY display_order ASC"
-      ),
-    ]);
+  try {
+    const data = await getCached("browse-data", 300, async () => {
+      const [videos, series, categories, carousel] = await Promise.all([
+        query(
+          `SELECT v.*, s.title as series_title
+           FROM videos v
+           LEFT JOIN series s ON v.series_id = s.id
+           WHERE v.is_published = true
+           ORDER BY v.release_date DESC NULLS LAST, v.created_at DESC`
+        ),
+        query(`SELECT * FROM series ORDER BY created_at DESC`),
+        query(`SELECT * FROM categories ORDER BY sort_order ASC, name ASC`).catch(() => ({ rows: [] })),
+        query(`SELECT * FROM carousel_items WHERE is_active = true ORDER BY display_order ASC`).catch(() => ({ rows: [] })),
+      ]);
 
-    return {
-      videos: videos.rows,
-      series: series.rows,
-      categories: categories.rows,
-      carousel: carousel.rows,
-    };
-  });
-
-  return c.json(data);
+      return {
+        videos: videos.rows,
+        series: series.rows,
+        categories: categories.rows,
+        carousel: carousel.rows,
+      };
+    });
+    return c.json(data);
+  } catch (err) {
+    console.error("browse-data error:", err);
+    return c.json({ videos: [], series: [], categories: [], carousel: [] });
+  }
 });
 
 app.get("/api/series/:id", async (c) => {
@@ -495,7 +498,9 @@ app.delete("/api/users/delete-account", clerkAuth, async (c) => {
 app.get("/api/watchlist", clerkAuth, async (c) => {
   const user = c.get("user");
   const result = await query(
-    `SELECT v.*, w.created_at as added_at
+    `SELECT v.id, v.title, v.slug, v.thumbnail_url, v.mux_playback_id, v.is_free,
+            v.content_type, v.series_id, v.episode_number, v.season_number,
+            w.created_at as added_at
      FROM watchlist w JOIN videos v ON w.video_id = v.id
      WHERE w.user_id = $1
      ORDER BY w.created_at DESC`,
@@ -528,7 +533,8 @@ app.delete("/api/watchlist/:videoId", clerkAuth, async (c) => {
 app.get("/api/playback-history", clerkAuth, async (c) => {
   const user = c.get("user");
   const result = await query(
-    `SELECT ph.*, v.title, v.thumbnail_url, v.mux_duration, v.series_id, v.slug
+    `SELECT ph.video_id, ph.last_position_seconds, ph.completed,
+            v.title, v.thumbnail_url, v.mux_duration, v.series_id, v.slug
      FROM playback_history ph JOIN videos v ON ph.video_id = v.id
      WHERE ph.user_id = $1
      ORDER BY ph.last_watched_at DESC
@@ -630,51 +636,61 @@ app.get("/api/admin/videos", clerkAuth, adminAuth, async (c) => {
 app.post("/api/admin/videos", clerkAuth, adminAuth, async (c) => {
   const user = c.get("user");
   const body = await c.req.json<Record<string, unknown>>();
-  const result = await query(
-    `INSERT INTO videos (title, slug, description, content_type, mux_asset_id, mux_playback_id,
-      mux_duration, thumbnail_url, hero_image_url, carousel_image_url, category_id, series_id,
-      episode_number, season_number, is_published, is_free, release_date,
-      intro_start_seconds, intro_end_seconds, content_rating, genre, cast, director,
-      created_by_user_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
-     RETURNING *`,
-    [
-      body.title, body.slug, body.description, body.content_type ?? "movie",
-      body.mux_asset_id, body.mux_playback_id, body.mux_duration,
-      body.thumbnail_url, body.hero_image_url, body.carousel_image_url,
-      body.category_id, body.series_id, body.episode_number, body.season_number,
-      body.is_published ?? false, body.is_free ?? false, body.release_date,
-      body.intro_start_seconds, body.intro_end_seconds, body.content_rating,
-      body.genre, body.cast, body.director, user.id,
-    ]
-  );
-  await invalidateCache("browse-data");
-  return c.json(result.rows[0], 201);
+  try {
+    const result = await query(
+      `INSERT INTO videos (title, slug, description, content_type, mux_asset_id, mux_playback_id,
+        mux_duration, thumbnail_url, hero_image_url, carousel_image_url, category_id, series_id,
+        episode_number, season_number, is_published, is_free, release_date,
+        intro_start_seconds, intro_end_seconds, content_rating, genre, cast, director,
+        created_by_user_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+       RETURNING *`,
+      [
+        body.title, body.slug || null, body.description || null, body.content_type ?? "movie",
+        body.mux_asset_id || null, body.mux_playback_id || null, body.mux_duration || null,
+        body.thumbnail_url || null, body.hero_image_url || null, body.carousel_image_url || null,
+        body.category_id || null, body.series_id || null, body.episode_number || null, body.season_number || null,
+        body.is_published ?? false, body.is_free ?? false, body.release_date || null,
+        body.intro_start_seconds || null, body.intro_end_seconds || null, body.content_rating || null,
+        body.genre || null, body.cast || null, body.director || null, user.id,
+      ]
+    );
+    await invalidateCache("browse-data");
+    return c.json(result.rows[0], 201);
+  } catch (err) {
+    console.error("POST /api/admin/videos error:", err);
+    return c.json({ error: (err as Error).message }, 500);
+  }
 });
 
 app.put("/api/admin/videos/:id", clerkAuth, adminAuth, async (c) => {
   const id = Number(c.req.param("id"));
   const body = await c.req.json<Record<string, unknown>>();
-  const result = await query(
-    `UPDATE videos SET title=$1, slug=$2, description=$3, content_type=$4, mux_asset_id=$5,
-      mux_playback_id=$6, mux_duration=$7, thumbnail_url=$8, hero_image_url=$9,
-      carousel_image_url=$10, category_id=$11, series_id=$12, episode_number=$13,
-      season_number=$14, is_published=$15, is_free=$16, release_date=$17,
-      intro_start_seconds=$18, intro_end_seconds=$19, content_rating=$20,
-      genre=$21, cast=$22, director=$23, updated_at=NOW()
-     WHERE id=$24 RETURNING *`,
-    [
-      body.title, body.slug, body.description, body.content_type,
-      body.mux_asset_id, body.mux_playback_id, body.mux_duration,
-      body.thumbnail_url, body.hero_image_url, body.carousel_image_url,
-      body.category_id, body.series_id, body.episode_number, body.season_number,
-      body.is_published, body.is_free, body.release_date,
-      body.intro_start_seconds, body.intro_end_seconds, body.content_rating,
-      body.genre, body.cast, body.director, id,
-    ]
-  );
-  await invalidateCache("browse-data");
-  return c.json(result.rows[0]);
+  try {
+    const result = await query(
+      `UPDATE videos SET title=$1, slug=$2, description=$3, content_type=$4, mux_asset_id=$5,
+        mux_playback_id=$6, mux_duration=$7, thumbnail_url=$8, hero_image_url=$9,
+        carousel_image_url=$10, category_id=$11, series_id=$12, episode_number=$13,
+        season_number=$14, is_published=$15, is_free=$16, release_date=$17,
+        intro_start_seconds=$18, intro_end_seconds=$19, content_rating=$20,
+        genre=$21, cast=$22, director=$23, updated_at=NOW()
+       WHERE id=$24 RETURNING *`,
+      [
+        body.title, body.slug || null, body.description || null, body.content_type,
+        body.mux_asset_id || null, body.mux_playback_id || null, body.mux_duration || null,
+        body.thumbnail_url || null, body.hero_image_url || null, body.carousel_image_url || null,
+        body.category_id || null, body.series_id || null, body.episode_number || null, body.season_number || null,
+        body.is_published ?? false, body.is_free ?? false, body.release_date || null,
+        body.intro_start_seconds || null, body.intro_end_seconds || null, body.content_rating || null,
+        body.genre || null, body.cast || null, body.director || null, id,
+      ]
+    );
+    await invalidateCache("browse-data");
+    return c.json(result.rows[0]);
+  } catch (err) {
+    console.error("PUT /api/admin/videos error:", err);
+    return c.json({ error: (err as Error).message }, 500);
+  }
 });
 
 app.delete("/api/admin/videos/:id", clerkAuth, adminAuth, async (c) => {
@@ -698,36 +714,48 @@ app.get("/api/admin/series", clerkAuth, adminAuth, async (c) => {
 app.post("/api/admin/series", clerkAuth, adminAuth, async (c) => {
   const user = c.get("user");
   const body = await c.req.json<Record<string, unknown>>();
-  const result = await query(
-    `INSERT INTO series (title, slug, description, cover_image_url, carousel_image_url,
-      hero_image_url, release_date, cast, director, content_rating, category_id, created_by_user_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-    [
-      body.title, body.slug, body.description, body.cover_image_url,
-      body.carousel_image_url, body.hero_image_url, body.release_date,
-      body.cast, body.director, body.content_rating, body.category_id, user.id,
-    ]
-  );
-  await invalidateCache("browse-data");
-  return c.json(result.rows[0], 201);
+  try {
+    const result = await query(
+      `INSERT INTO series (title, slug, description, cover_image_url, carousel_image_url,
+        hero_image_url, release_date, cast, director, content_rating, category_id, created_by_user_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [
+        body.title, body.slug || null, body.description || null, body.cover_image_url || null,
+        body.carousel_image_url || null, body.hero_image_url || null, body.release_date || null,
+        body.cast || null, body.director || null, body.content_rating || null,
+        body.category_id || null, user.id,
+      ]
+    );
+    await invalidateCache("browse-data");
+    return c.json(result.rows[0], 201);
+  } catch (err) {
+    console.error("POST /api/admin/series error:", err);
+    return c.json({ error: (err as Error).message }, 500);
+  }
 });
 
 app.put("/api/admin/series/:id", clerkAuth, adminAuth, async (c) => {
   const id = Number(c.req.param("id"));
   const body = await c.req.json<Record<string, unknown>>();
-  const result = await query(
-    `UPDATE series SET title=$1, slug=$2, description=$3, cover_image_url=$4,
-      carousel_image_url=$5, hero_image_url=$6, release_date=$7, cast=$8,
-      director=$9, content_rating=$10, category_id=$11, updated_at=NOW()
-     WHERE id=$12 RETURNING *`,
-    [
-      body.title, body.slug, body.description, body.cover_image_url,
-      body.carousel_image_url, body.hero_image_url, body.release_date,
-      body.cast, body.director, body.content_rating, body.category_id, id,
-    ]
-  );
-  await invalidateCache("browse-data");
-  return c.json(result.rows[0]);
+  try {
+    const result = await query(
+      `UPDATE series SET title=$1, slug=$2, description=$3, cover_image_url=$4,
+        carousel_image_url=$5, hero_image_url=$6, release_date=$7, cast=$8,
+        director=$9, content_rating=$10, category_id=$11, updated_at=NOW()
+       WHERE id=$12 RETURNING *`,
+      [
+        body.title, body.slug || null, body.description || null, body.cover_image_url || null,
+        body.carousel_image_url || null, body.hero_image_url || null, body.release_date || null,
+        body.cast || null, body.director || null, body.content_rating || null,
+        body.category_id || null, id,
+      ]
+    );
+    await invalidateCache("browse-data");
+    return c.json(result.rows[0]);
+  } catch (err) {
+    console.error("PUT /api/admin/series error:", err);
+    return c.json({ error: (err as Error).message }, 500);
+  }
 });
 
 app.delete("/api/admin/series/:id", clerkAuth, adminAuth, async (c) => {
