@@ -28,7 +28,7 @@ function relativeTime(dateStr: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-function CommentSection({ videoId, isAdmin }: { videoId: number; isAdmin: boolean }) {
+function CommentSection({ videoId, isAdmin, canComment }: { videoId: number; isAdmin: boolean; canComment: boolean }) {
   const { user, isLoaded } = useUser();
   const { openSignIn } = useClerk();
   const [comments, setComments] = useState<Comment[]>([]);
@@ -97,7 +97,42 @@ function CommentSection({ videoId, isAdmin }: { videoId: number; isAdmin: boolea
     <div className="mt-10">
       <h2 className="text-lg font-black mb-4">{total > 0 ? `${total} Comment${total !== 1 ? "s" : ""}` : "Comments"}</h2>
 
-      {user ? (
+      {!user ? (
+        /* Not signed in */
+        <div className="mb-6 relative rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="px-4 py-10 bg-zinc-900 flex flex-col items-center gap-3 text-center">
+            <div className="p-3 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
+              <Lock className="w-7 h-7" style={{ color: '#E8001D' }} />
+            </div>
+            <p className="font-black text-base">Members Only</p>
+            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>Sign in to join the conversation.</p>
+            <button
+              onClick={() => openSignIn()}
+              style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '10px 22px', display: 'inline-block', marginTop: 4 }}
+            >
+              <span className="font-extrabold text-sm tracking-[0.08em] uppercase" style={{ transform: 'skewX(6deg)', display: 'block' }}>Sign In</span>
+            </button>
+          </div>
+        </div>
+      ) : !canComment ? (
+        /* Signed in but not subscribed */
+        <div className="mb-6 relative rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="px-4 py-10 bg-zinc-900 flex flex-col items-center gap-3 text-center">
+            <div className="p-3 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
+              <Lock className="w-7 h-7" style={{ color: '#E8001D' }} />
+            </div>
+            <p className="font-black text-base">Members Only</p>
+            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>Subscribe to join the conversation.</p>
+            <Link
+              to="/subscribe"
+              style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '10px 22px', display: 'inline-block', marginTop: 4 }}
+            >
+              <span className="font-extrabold text-sm tracking-[0.08em] uppercase" style={{ transform: 'skewX(6deg)', display: 'block' }}>Join the Community</span>
+            </Link>
+          </div>
+        </div>
+      ) : (
+        /* Subscribed — show textarea */
         <div className="mb-6">
           <textarea
             value={body}
@@ -127,10 +162,6 @@ function CommentSection({ videoId, isAdmin }: { videoId: number; isAdmin: boolea
             </div>
           </div>
         </div>
-      ) : (
-        <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.4)' }}>
-          <button onClick={() => openSignIn()} className="font-bold text-white hover:text-red-500 transition-colors">Sign in</button> to join the conversation
-        </p>
       )}
 
       <div className="space-y-4">
@@ -455,7 +486,7 @@ export default function WatchPage() {
         </div>
 
         {/* Comments */}
-        <CommentSection videoId={video.id} isAdmin={false} />
+        <CommentSection videoId={video.id} isAdmin={false} canComment={canWatch} />
 
         {/* Footer */}
         <div className="mt-12 flex items-center gap-4">

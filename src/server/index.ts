@@ -1067,7 +1067,7 @@ app.get("/api/videos/:id/comments", async (c) => {
   return c.json({ comments, total: Number(countResult.rows[0].count), hasMore });
 });
 
-// POST /api/videos/:id/comments — authenticated
+// POST /api/videos/:id/comments — authenticated + active subscription required
 app.post("/api/videos/:id/comments", clerkAuth, async (c) => {
   const user = c.get("user");
   const videoId = Number(c.req.param("id"));
@@ -1077,6 +1077,17 @@ app.post("/api/videos/:id/comments", clerkAuth, async (c) => {
   if (!text) return c.json({ error: "Comment cannot be empty." }, 400);
   if (text.length > 500) return c.json({ error: "Comment cannot exceed 500 characters." }, 400);
   if (containsBlockedContent(text)) return c.json({ error: "Comment contains prohibited content." }, 400);
+
+  // Require active subscription (admins/creators bypass)
+  if (user.role !== "admin" && user.role !== "creator") {
+    const subResult = await query(
+      `SELECT status FROM subscriptions WHERE user_id = $1 AND status = 'active' LIMIT 1`,
+      [user.id]
+    );
+    if (subResult.rows.length === 0) {
+      return c.json({ error: "An active subscription is required to comment." }, 403);
+    }
+  }
 
   // Rate limit: max 5 comments per user per 60 seconds
   const rateLimitKey = `comment_rate:${user.id}`;
