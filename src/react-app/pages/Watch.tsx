@@ -6,7 +6,176 @@ import { apiFetch } from "@/react-app/utils/api";
 import { hasAccess } from "@/react-app/utils/access";
 import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
 import type { Video, Subscription } from "@/shared/types";
-import { Bookmark, BookmarkCheck, ChevronRight, Lock, Play, ArrowLeft } from "lucide-react";
+import { Bookmark, BookmarkCheck, ChevronRight, Lock, Play, ArrowLeft, Trash2 } from "lucide-react";
+
+interface Comment {
+  id: number;
+  body: string;
+  created_at: string;
+  display_name: string;
+  avatar_url: string | null;
+  user_id: number;
+  is_owner: boolean;
+}
+
+function relativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function CommentSection({ videoId, isAdmin }: { videoId: number; isAdmin: boolean }) {
+  const { user, isLoaded } = useUser();
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [body, setBody] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    apiFetch(`/api/videos/${videoId}/comments?page=1&limit=20`)
+      .then(r => r.json())
+      .then(data => {
+        setComments(data.comments ?? []);
+        setTotal(data.total ?? 0);
+        setHasMore(data.hasMore ?? false);
+        setPage(1);
+      })
+      .catch(() => {});
+  }, [videoId]);
+
+  const loadMore = async () => {
+    const next = page + 1;
+    const r = await apiFetch(`/api/videos/${videoId}/comments?page=${next}&limit=20`);
+    const data = await r.json();
+    setComments(prev => [...prev, ...(data.comments ?? [])]);
+    setHasMore(data.hasMore ?? false);
+    setPage(next);
+  };
+
+  const handleSubmit = async () => {
+    if (!body.trim() || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const r = await apiFetch(`/api/videos/${videoId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: body.trim() }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setError(d.error ?? "Failed to post comment.");
+        return;
+      }
+      const newComment = await r.json();
+      setComments(prev => [newComment, ...prev]);
+      setTotal(t => t + 1);
+      setBody("");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Delete this comment?")) return;
+    await apiFetch(`/api/comments/${id}`, { method: "DELETE" });
+    setComments(prev => prev.filter(c => c.id !== id));
+    setTotal(t => t - 1);
+  };
+
+  if (!isLoaded) return null;
+
+  return (
+    <div className="mt-10">
+      <h2 className="text-lg font-black mb-4">{total > 0 ? `${total} Comment${total !== 1 ? "s" : ""}` : "Comments"}</h2>
+
+      {user ? (
+        <div className="mb-6">
+          <textarea
+            value={body}
+            onChange={e => setBody(e.target.value.slice(0, 500))}
+            placeholder="Share your thoughts..."
+            rows={3}
+            className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-red-600 text-white placeholder-gray-600"
+          />
+          <div className="flex items-center justify-between mt-2">
+            <div>
+              {error && <p className="text-xs text-red-500">{error}</p>}
+              <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                By commenting you agree to our{" "}
+                <Link to="/community-guidelines" className="underline hover:text-white transition-colors">Community Guidelines</Link>
+              </p>
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{body.length} / 500</span>
+              <button
+                onClick={handleSubmit}
+                disabled={!body.trim() || submitting}
+                className="px-4 py-1.5 text-sm font-bold rounded-lg transition-colors disabled:opacity-40"
+                style={{ backgroundColor: '#E8001D', color: 'white' }}
+              >
+                {submitting ? "Posting..." : "Post"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          <Link to="/sso-callback" className="font-bold text-white hover:text-red-500 transition-colors">Sign in</Link> to join the conversation
+        </p>
+      )}
+
+      <div className="space-y-4">
+        {comments.map(c => {
+          const initials = (c.display_name || "?").slice(0, 2).toUpperCase();
+          return (
+            <div key={c.id} className="flex gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: '#E8001D' }}>
+                {c.avatar_url ? <img src={c.avatar_url} alt={c.display_name} className="w-full h-full object-cover" /> : initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-xs font-bold">{c.display_name || "Unknown"}</span>
+                  <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{relativeTime(c.created_at)}</span>
+                </div>
+                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.75)' }}>{c.body}</p>
+              </div>
+              {(c.is_owner || isAdmin) && (
+                <button
+                  onClick={() => handleDelete(c.id)}
+                  className="flex-shrink-0 p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-900/30 transition-colors self-start"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {hasMore && (
+        <button
+          onClick={loadMore}
+          className="mt-6 w-full py-2.5 text-sm font-bold rounded-xl border border-gray-700 hover:border-gray-500 transition-colors"
+          style={{ color: 'rgba(255,255,255,0.5)' }}
+        >
+          Load more comments
+        </button>
+      )}
+
+      {comments.length === 0 && (
+        <p className="text-sm py-6 text-center" style={{ color: 'rgba(255,255,255,0.25)' }}>No comments yet. Be the first!</p>
+      )}
+    </div>
+  );
+}
 
 interface WatchData {
   video: Video;
@@ -283,6 +452,9 @@ export default function WatchPage() {
             </Link>
           )}
         </div>
+
+        {/* Comments */}
+        <CommentSection videoId={video.id} isAdmin={false} />
 
         {/* Footer */}
         <div className="mt-12 flex items-center gap-4">

@@ -282,5 +282,18 @@ export async function runMigrations() {
     await query(sql).catch(() => {}); // safe — ignore if column already exists
   }
 
+  // Comments table
+  await query(`
+    CREATE TABLE IF NOT EXISTS comments (
+      id SERIAL PRIMARY KEY,
+      video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_comments_video_id ON comments(video_id)`);
+
   console.log("DB migrations complete.");
 }

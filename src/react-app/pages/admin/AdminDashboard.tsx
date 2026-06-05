@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { useAdminRole } from "@/react-app/hooks/useAdminRole";
 import { apiFetch } from "@/react-app/utils/api";
 import {
-  Film, Layers, Image, Users, Star, AlignLeft, Megaphone, BarChart2,
+  Film, Layers, Image, Users, Star, AlignLeft, Megaphone, BarChart2, MessageSquare,
 } from "lucide-react";
 
 interface DashboardStats {
@@ -53,6 +53,7 @@ export default function AdminDashboard() {
     { to: "/admin/abandoned", icon: BarChart2, label: "Abandoned Signups", count: stats.abandoned },
     { to: "/admin/contest-submissions", icon: AlignLeft, label: "Contest Submissions", count: stats.contestSubmissions },
     { to: "/admin/promo-popups", icon: Megaphone, label: "Promo Popups", count: null },
+    { to: "/admin/comments", icon: MessageSquare, label: "Comments", count: null },
   ];
 
   if (isChecking) {

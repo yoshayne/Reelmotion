@@ -3,11 +3,12 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { Webhook } from "svix";
 import { query, pool } from "./db.js";
+import { containsBlockedContent } from "./commentFilter.js";
 import { clerkAuth, adminAuth, clerk } from "./auth.js";
 import Stripe from "stripe";
 import { stripe, createCheckoutSession, createPortalSession } from "./stripe.js";
 import { uploadFile, getPublicUrl, getSignedDownloadUrl, listFiles } from "./storage.js";
-import { getCached, invalidateCache } from "./redis.js";
+import { getCached, invalidateCache, redis } from "./redis.js";
 import { runMigrations } from "./migrate.js";
 
 const app = new Hono();
@@ -1021,6 +1022,85 @@ app.get("/*", async (c) => {
   return c.html(
     (await import("node:fs")).readFileSync("./dist/client/index.html", "utf-8")
   );
+});
+
+// ─── Comments ────────────────────────────────────────────────────────────────
+
+// GET /api/videos/:id/comments — public, paginated
+app.get("/api/videos/:id/comments", async (c) => {
+  const videoId = Number(c.req.param("id"));
+  const page = Math.max(0, Number(c.req.query("page") ?? 0));
+  const limit = 20;
+  const offset = page * limit;
+  const result = await query(
+    `SELECT c.id, c.body, c.created_at,
+            u.display_name, u.avatar_url
+     FROM comments c
+     JOIN users u ON c.user_id = u.id
+     WHERE c.video_id = $1
+     ORDER BY c.created_at DESC
+     LIMIT $2 OFFSET $3`,
+    [videoId, limit, offset]
+  );
+  const countResult = await query("SELECT COUNT(*) FROM comments WHERE video_id = $1", [videoId]);
+  return c.json({ comments: result.rows, total: Number(countResult.rows[0].count) });
+});
+
+// POST /api/videos/:id/comments — authenticated
+app.post("/api/videos/:id/comments", clerkAuth, async (c) => {
+  const user = c.get("user");
+  const videoId = Number(c.req.param("id"));
+  const body = await c.req.json<{ body: string }>();
+  const text = (body.body ?? "").trim();
+
+  if (!text) return c.json({ error: "Comment cannot be empty." }, 400);
+  if (text.length > 500) return c.json({ error: "Comment cannot exceed 500 characters." }, 400);
+  if (containsBlockedContent(text)) return c.json({ error: "Comment contains prohibited content." }, 400);
+
+  // Rate limit: max 5 comments per user per 60 seconds
+  const rateLimitKey = `comment_rate:${user.id}`;
+  try {
+    const count = await redis.incr(rateLimitKey);
+    if (count === 1) await redis.expire(rateLimitKey, 60);
+    if (count > 5) return c.json({ error: "You're posting too fast. Please wait a moment." }, 429);
+  } catch { /* Redis unavailable — allow through */ }
+
+  const result = await query(
+    `INSERT INTO comments (video_id, user_id, body)
+     VALUES ($1, $2, $3)
+     RETURNING id, body, created_at`,
+    [videoId, user.id, text]
+  );
+  const comment = { ...result.rows[0], display_name: user.display_name, avatar_url: user.avatar_url };
+  return c.json(comment, 201);
+});
+
+// DELETE /api/comments/:id — owner or admin only
+app.delete("/api/comments/:id", clerkAuth, async (c) => {
+  const user = c.get("user");
+  const commentId = Number(c.req.param("id"));
+  const existing = await query("SELECT user_id FROM comments WHERE id = $1", [commentId]);
+  if (!existing.rows[0]) return c.json({ error: "Not found" }, 404);
+  if (existing.rows[0].user_id !== user.id && user.role !== "admin" && user.role !== "creator") {
+    return c.json({ error: "Forbidden" }, 403);
+  }
+  await query("DELETE FROM comments WHERE id = $1", [commentId]);
+  return c.json({ success: true });
+});
+
+// GET /api/admin/comments — all comments, admin only
+app.get("/api/admin/comments", clerkAuth, adminAuth, async (c) => {
+  const result = await query(
+    `SELECT c.id, c.body, c.created_at,
+            u.display_name, u.avatar_url,
+            v.title AS video_title, v.id AS video_id
+     FROM comments c
+     JOIN users u ON c.user_id = u.id
+     JOIN videos v ON c.video_id = v.id
+     ORDER BY c.created_at DESC
+     LIMIT 500`
+  );
+  return c.json(result.rows);
 });
 
 // ─── Start server ────────────────────────────────────────────────────────────
