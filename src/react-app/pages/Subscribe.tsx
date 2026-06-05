@@ -103,10 +103,15 @@ export default function SubscribePage() {
               backgroundColor: selected === "yearly" ? 'rgba(232,0,29,0.08)' : 'rgba(255,255,255,0.03)',
             }}
           >
-            <div className="absolute top-3 right-3 text-[10px] font-extrabold tracking-wider px-2 py-0.5 rounded" style={{ backgroundColor: 'rgba(34,197,94,0.2)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>
-              BEST VALUE
+            <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+              <span className="text-[10px] font-extrabold tracking-wider px-2 py-0.5 rounded" style={{ backgroundColor: 'rgba(34,197,94,0.2)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>
+                BEST VALUE
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{ backgroundColor: 'rgba(232,0,29,0.15)', color: '#fca5a5', border: '1px solid rgba(232,0,29,0.3)' }}>
+                SAVE 50%
+              </span>
             </div>
-            <div className="flex items-start gap-3 pr-20">
+            <div className="flex items-start gap-3 pr-24">
               <div
                 className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
                 style={{ borderColor: selected === "yearly" ? '#E8001D' : 'rgba(255,255,255,0.3)' }}
@@ -115,7 +120,12 @@ export default function SubscribePage() {
               </div>
               <div>
                 <p className="font-black">Annual Member Access</p>
-                <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>Pay once yearly — save 20%</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-black">$24.99</span>
+                  <span className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>/year</span>
+                  <span className="text-sm line-through" style={{ color: 'rgba(255,255,255,0.3)' }}>$49.99</span>
+                </div>
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Billed once yearly · just $2.08/mo</p>
               </div>
             </div>
             {selected === "yearly" && (
@@ -144,7 +154,11 @@ export default function SubscribePage() {
               </div>
               <div>
                 <p className="font-black">Monthly Member Access</p>
-                <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>Billed monthly, cancel anytime</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-black">$4.99</span>
+                  <span className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>/month</span>
+                </div>
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Billed monthly · cancel anytime</p>
               </div>
             </div>
             {selected === "monthly" && (
