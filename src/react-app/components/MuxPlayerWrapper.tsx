@@ -119,7 +119,7 @@ export default function MuxPlayerWrapper({
         start-time={startTime}
         autoplay={autoPlay}
         controls
-        style={{ width: "100%", aspectRatio: "16/9" }}
+        style={{ width: "100%", aspectRatio: "16/9", display: "block" }}
       />
 
       {showSkipIntro && (
