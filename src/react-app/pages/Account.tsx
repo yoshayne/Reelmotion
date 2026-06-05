@@ -36,7 +36,14 @@ export default function AccountPage() {
   }, [isLoaded, user, navigate]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      // Clear everything when logged out so stale data never shows
+      setDisplayName("");
+      setAvatarUrl(null);
+      setSubscription(null);
+      setUserRole("");
+      return;
+    }
     apiFetch("/api/users/me")
       .then((r) => r.json() as Promise<{ display_name: string; avatar_url: string; subscription: Subscription | null; role: string }>)
       .then((data) => {
@@ -45,7 +52,7 @@ export default function AccountPage() {
         setSubscription(data.subscription);
         setUserRole(data.role || "");
       });
-  }, [user]);
+  }, [user?.id]);
 
   const handleSave = async () => {
     setSaving(true);

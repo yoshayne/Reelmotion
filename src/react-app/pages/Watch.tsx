@@ -39,6 +39,10 @@ export default function WatchPage() {
   }, [id]);
 
   useEffect(() => {
+    // Reset user-specific state whenever user identity changes
+    setSubscription(null);
+    setInWatchlist(false);
+    setStartTime(0);
     if (!isLoaded || !user || !watchData) return;
     Promise.all([
       apiFetch("/api/billing/subscription").then((r) => r.json() as Promise<Subscription | null>),
@@ -50,7 +54,7 @@ export default function WatchPage() {
       const pos = Array.isArray(history) && history.find((h) => h.video_id === watchData.video.id);
       if (pos && pos.last_position_seconds > 5) setStartTime(pos.last_position_seconds);
     });
-  }, [user, isLoaded, watchData]);
+  }, [user?.id, isLoaded, watchData?.video.id]);
 
   const handleTimeUpdate = useCallback(
     (time: number, duration: number) => {
