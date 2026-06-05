@@ -40,7 +40,6 @@ export default function Browse() {
       }
       if (wl?.items) setWatchlist(new Set(wl.items.map((i: any) => i.video_id)));
       if (wl && Array.isArray(wl)) setWatchlist(new Set((wl as any[]).map((i: any) => i.video_id || i.id)));
-      // Build continue watching from history + browse data videos
       if (Array.isArray(history) && Array.isArray(data?.videos)) {
         const cw = history
           .filter((h: any) => h.last_position_seconds > 5)
@@ -56,7 +55,6 @@ export default function Browse() {
     }).catch(console.error).finally(() => setLoading(false));
   }, []);
 
-  // Hero auto-rotate
   useEffect(() => {
     if (!browseData?.carousel?.length) return;
     heroIntervalRef.current = setInterval(() => setHeroIndex(i => (i + 1) % (browseData.carousel?.length ?? 1)), 5000);
@@ -96,9 +94,6 @@ export default function Browse() {
   const movies = allVideos.filter(v => v.content_type === "movie");
   const clips = allVideos.filter(v => v.content_type === "clip");
 
-  // Use first 5 movies as "trending" for the trending section
-  const trending = movies.slice(0, 5).length > 0 ? movies.slice(0, 5) : allVideos.slice(0, 5);
-
   const tabs: { id: TabType; label: string }[] = [
     { id: "all", label: "ALL" },
     { id: "new", label: "NEW" },
@@ -106,6 +101,55 @@ export default function Browse() {
     { id: "movies", label: "MOVIES" },
     { id: "clips", label: "CLIPS" },
   ];
+
+  // Shared horizontal scroll row
+  function ScrollRow({ children }: { children: React.ReactNode }) {
+    return (
+      <div className="overflow-x-auto scrollbar-hide">
+        <div className="flex gap-3 px-4" style={{ paddingRight: 16 }}>
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  // Section heading
+  function SectionHead({ eyebrow, title, onSeeAll }: { eyebrow: string; title: string; onSeeAll?: () => void }) {
+    return (
+      <div className="px-4 mb-3 flex items-end justify-between">
+        <div>
+          <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>{eyebrow}</p>
+          <h2 style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', lineHeight: 1.1 }}>{title}</h2>
+        </div>
+        {onSeeAll && (
+          <button onClick={onSeeAll} style={{ color: '#E8001D', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', paddingBottom: 2 }}>SEE ALL</button>
+        )}
+      </div>
+    );
+  }
+
+  // Poster card (2:3 aspect ratio)
+  function PosterCard({ image, title, onClick, badge }: { image?: string | null; title: string; onClick: () => void; badge?: React.ReactNode }) {
+    return (
+      <div onClick={onClick} className="flex-shrink-0 cursor-pointer" style={{ width: 160 }}>
+        <div className="relative overflow-hidden" style={{ aspectRatio: '2/3', clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)' }}>
+          {image ? (
+            <img src={image} alt={title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
+              <Play className="w-8 h-8 text-zinc-700" />
+            </div>
+          )}
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 45%)' }} />
+          {badge && <div className="absolute top-2 left-2">{badge}</div>}
+          <div className="absolute bottom-2 left-2 flex items-center justify-center" style={{ width: 26, height: 26, borderRadius: '50%', backgroundColor: 'rgba(232,0,29,0.9)' }}>
+            <Play className="w-3 h-3 ml-0.5" fill="currentColor" />
+          </div>
+        </div>
+        <p className="text-[12px] font-semibold mt-1.5 truncate" style={{ color: 'rgba(255,255,255,0.85)' }}>{title}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
@@ -127,33 +171,30 @@ export default function Browse() {
       )}
 
       {/* Hero Section */}
-      {/* Hero Section — sits below the fixed navbar */}
-      <div className="relative overflow-hidden" style={{ height: 280, marginTop: 72 }}>
+      <div className="relative overflow-hidden" style={{ height: 380, marginTop: 56 }}>
         {hero?.image_url && (
           <img src={hero.image_url} alt={hero.title} className="absolute inset-0 w-full h-full object-cover" style={{ zIndex: 0 }} />
         )}
-        {/* Diagonal color split */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(125deg, rgba(232,0,29,0.85) 0%, rgba(139,0,16,0.85) 38%, transparent 38.5%)', zIndex: 1 }} />
-        {/* Bottom fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-20" style={{ background: 'linear-gradient(to top, #000, transparent)', zIndex: 2 }} />
+        {/* Dark vignette so text is always readable */}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.15) 100%)', zIndex: 1 }} />
+        {/* Diagonal red accent on left */}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(125deg, rgba(232,0,29,0.55) 0%, transparent 42%)', zIndex: 1 }} />
 
-        {/* Content */}
-        <div className="absolute inset-0 flex flex-col justify-end pb-6 px-4" style={{ zIndex: 3 }}>
-          {/* NOW TRENDING badge */}
+        {/* Content pinned to bottom-left with consistent margin */}
+        <div className="absolute inset-x-0 bottom-0 px-4 pb-6" style={{ zIndex: 3 }}>
           <div className="mb-2">
-            <span className="text-white px-2 py-1 text-[9px] font-extrabold tracking-[0.2em] uppercase" style={{ backgroundColor: '#E8001D' }}>NOW TRENDING</span>
+            <span className="text-white px-2 py-0.5 text-[9px] font-extrabold tracking-[0.2em] uppercase" style={{ backgroundColor: '#E8001D' }}>NOW TRENDING</span>
           </div>
-          <h1 className="text-white font-black uppercase mb-3" style={{ fontSize: 30, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+          <h1 className="text-white font-black uppercase mb-3" style={{ fontSize: 34, letterSpacing: '-0.02em', lineHeight: 1.05 }}>
             <span style={{ color: '#E8001D' }}>{(hero?.title || "Featured")[0]}</span>{(hero?.title || "Featured").slice(1)}
           </h1>
-          {/* Parallelogram buttons */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
                 if (hero?.video_id) navigate(`/watch/${hero.video_id}`);
                 else if (hero?.series_id) navigate(`/series/${hero.series_id}`);
               }}
-              style={{ transform: 'skewX(-8deg)', backgroundColor: '#E8001D', padding: '11px 20px' }}
+              style={{ transform: 'skewX(-8deg)', backgroundColor: '#E8001D', padding: '11px 22px' }}
             >
               <span className="flex items-center gap-2 font-extrabold text-xs tracking-[0.1em] uppercase" style={{ transform: 'skewX(8deg)', display: 'block' }}>
                 <Play className="w-3.5 h-3.5 inline" fill="currentColor" /> WATCH NOW
@@ -161,7 +202,7 @@ export default function Browse() {
             </button>
             <button
               onClick={() => hero?.video_id && toggleWatchlist(hero.video_id)}
-              style={{ transform: 'skewX(-8deg)', border: '1px solid rgba(255,255,255,0.25)', padding: '11px 20px' }}
+              style={{ transform: 'skewX(-8deg)', border: '1px solid rgba(255,255,255,0.3)', padding: '11px 22px' }}
             >
               <span className="flex items-center gap-2 font-extrabold text-xs tracking-[0.1em] uppercase" style={{ transform: 'skewX(8deg)', display: 'block' }}>
                 {hero?.video_id && watchlist.has(hero.video_id) ? <BookmarkCheck className="w-3.5 h-3.5 inline" /> : <BookmarkPlus className="w-3.5 h-3.5 inline" />} LIST
@@ -170,10 +211,18 @@ export default function Browse() {
           </div>
         </div>
 
-        {/* Ghost rank number */}
-        <span className="absolute top-16 right-4 select-none pointer-events-none font-black" style={{ fontSize: 130, fontWeight: 900, color: 'rgba(0,0,0,0.35)', WebkitTextStroke: '1px rgba(255,255,255,0.08)', zIndex: 2 }}>
-          {heroIndex + 1}
-        </span>
+        {/* Carousel dots */}
+        {(browseData?.carousel?.length ?? 0) > 1 && (
+          <div className="absolute bottom-3 right-4 flex gap-1.5" style={{ zIndex: 3 }}>
+            {browseData!.carousel!.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setHeroIndex(i)}
+                style={{ width: i === heroIndex ? 16 : 6, height: 6, borderRadius: 3, backgroundColor: i === heroIndex ? '#E8001D' : 'rgba(255,255,255,0.3)', transition: 'all 0.2s' }}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -194,200 +243,108 @@ export default function Browse() {
         ))}
       </div>
 
-      {/* Content area */}
+      {/* Content */}
       <div className="pb-24 relative z-10">
+
         {/* Continue Watching */}
         {continueWatching.length > 0 && (
-          <div className="mt-5 mb-5">
-            <div className="px-4 mb-3 flex items-center justify-between">
-              <div>
-                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>PICK UP WHERE YOU LEFT OFF</p>
-                <h2 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.03em', color: '#fff' }}>Continue Watching</h2>
-              </div>
-            </div>
-            <div className="overflow-x-auto scrollbar-hide px-4">
-              <div className="flex" style={{ gap: 2 }}>
-                {continueWatching.map((item: any) => (
-                  <div key={item.id} onClick={() => navigate(`/watch/${item.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 130 }}>
-                    <div className="relative overflow-hidden" style={{ height: 80, clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%)' }}>
-                      {item.thumbnail_url ? (
-                        <img src={item.thumbnail_url} alt={item.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-zinc-900" />
-                      )}
-                      {/* Progress bar */}
-                      {item.last_position_seconds && item.mux_duration && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/20">
-                          <div className="h-full" style={{ width: `${Math.min(100, (item.last_position_seconds / item.mux_duration) * 100)}%`, backgroundColor: '#E8001D' }} />
-                        </div>
-                      )}
-                      {/* Episode badge */}
-                      {item.episode_number && (
-                        <div className="absolute top-1 left-1 px-1 text-[9px] font-bold" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>E{item.episode_number}</div>
-                      )}
-                    </div>
-                    <div className="px-1.5 py-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderLeft: '2px solid #E8001D' }}>
-                      <p className="text-[10px] font-bold truncate">{item.title}</p>
-                    </div>
+          <div className="mt-6 mb-2">
+            <SectionHead eyebrow="PICK UP WHERE YOU LEFT OFF" title="Continue Watching" />
+            <ScrollRow>
+              {continueWatching.map((item: any) => (
+                <div key={item.id} onClick={() => navigate(`/watch/${item.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 180 }}>
+                  <div className="relative overflow-hidden rounded" style={{ height: 102, clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%)' }}>
+                    {item.thumbnail_url ? (
+                      <img src={item.thumbnail_url} alt={item.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-zinc-900" />
+                    )}
+                    {item.last_position_seconds && item.mux_duration && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/20">
+                        <div className="h-full" style={{ width: `${Math.min(100, (item.last_position_seconds / item.mux_duration) * 100)}%`, backgroundColor: '#E8001D' }} />
+                      </div>
+                    )}
+                    {item.episode_number && (
+                      <div className="absolute top-1.5 left-1.5 px-1.5 text-[9px] font-bold rounded" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}>E{item.episode_number}</div>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Trending section */}
-        {(activeTab === "all" || activeTab === "movies") && trending.length > 0 && (
-          <div className="mt-5 mb-6">
-            <div className="px-4 mb-3 flex items-center justify-between">
-              <div>
-                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>TOP PICKS</p>
-                <h2 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.03em', color: '#fff' }}>Trending</h2>
-              </div>
-            </div>
-            <div className="px-4">
-              <div className="flex gap-2">
-                {trending.slice(0, 5).map((video: Video, index: number) => (
-                  <div key={video.id} onClick={() => navigate(`/watch/${video.id}`)} className="relative cursor-pointer flex-shrink-0" style={{ width: 'calc((100% - 40px) / 5)' }}>
-                    <div className="relative aspect-[2/3] overflow-hidden" style={{ clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)' }}>
-                      {video.thumbnail_url ? (
-                        <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-zinc-900" />
-                      )}
-                      <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 50%)' }} />
-                    </div>
-                    {/* Ghost rank */}
-                    <span className="absolute bottom-4 right-1 font-black select-none pointer-events-none" style={{ fontSize: 48, fontWeight: 900, color: 'rgba(0,0,0,0.35)', WebkitTextStroke: '1px rgba(255,255,255,0.08)', lineHeight: 1 }}>
-                      {index + 1}
-                    </span>
-                    {/* Red play circle */}
-                    <div className="absolute bottom-2 left-2 flex items-center justify-center" style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: 'rgba(232,0,29,0.9)' }}>
-                      <Play className="w-3 h-3 ml-0.5" fill="currentColor" />
-                    </div>
+                  <div className="px-2 py-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderLeft: '2px solid #E8001D' }}>
+                    <p className="text-[11px] font-bold truncate">{item.title}</p>
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              ))}
+            </ScrollRow>
           </div>
         )}
 
         {/* Series section */}
         {(activeTab === "all" || activeTab === "series") && allSeries.length > 0 && (
-          <div className="mt-5 mb-6">
-            <div className="px-4 mb-3 flex items-center justify-between">
-              <div>
-                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>EXPLORE</p>
-                <h2 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.03em', color: '#fff' }}>Series</h2>
-              </div>
-              <button onClick={() => setActiveTab("series")} style={{ color: '#E8001D', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em' }}>SEE ALL</button>
-            </div>
-            <div className="overflow-x-auto scrollbar-hide px-4">
-              <div className="flex gap-2">
-                {allSeries.slice(0, 10).map((s: Series) => (
-                  <div key={s.id} onClick={() => navigate(`/series/${s.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 130 }}>
-                    <div className="relative overflow-hidden aspect-[2/3]" style={{ clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)' }}>
-                      {s.cover_image_url ? (
-                        <img src={s.cover_image_url} alt={s.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
-                          <Play className="w-8 h-8 text-zinc-700" />
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-[11px] font-bold mt-1 truncate">{s.title}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Movies section */}
-        {(activeTab === "all" || activeTab === "movies") && movies.length > 0 && (
-          <div className="mt-5 mb-6">
-            <div className="px-4 mb-3 flex items-center justify-between">
-              <div>
-                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>WATCH NOW</p>
-                <h2 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.03em', color: '#fff' }}>Movies</h2>
-              </div>
-              <button onClick={() => setActiveTab("movies")} style={{ color: '#E8001D', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em' }}>SEE ALL</button>
-            </div>
-            <div className="overflow-x-auto scrollbar-hide px-4">
-              <div className="flex gap-2">
-                {movies.slice(0, 10).map((v: Video) => (
-                  <div key={v.id} onClick={() => navigate(`/watch/${v.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 130 }}>
-                    <div className="relative overflow-hidden aspect-[2/3]" style={{ clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)' }}>
-                      {v.thumbnail_url ? (
-                        <img src={v.thumbnail_url} alt={v.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-zinc-900" />
-                      )}
-                      <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%)' }} />
-                      <div className="absolute bottom-2 left-2 flex items-center justify-center" style={{ width: 20, height: 20, borderRadius: '50%', backgroundColor: 'rgba(232,0,29,0.9)' }}>
-                        <Play className="w-2.5 h-2.5 ml-0.5" fill="currentColor" />
-                      </div>
-                    </div>
-                    <p className="text-[11px] font-bold mt-1 truncate">{v.title}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+          <div className="mt-7 mb-2">
+            <SectionHead eyebrow="EXPLORE" title="Series" onSeeAll={() => setActiveTab("series")} />
+            <ScrollRow>
+              {allSeries.slice(0, 10).map((s: Series) => (
+                <PosterCard
+                  key={s.id}
+                  image={s.cover_image_url}
+                  title={s.title}
+                  onClick={() => navigate(`/series/${s.id}`)}
+                />
+              ))}
+            </ScrollRow>
           </div>
         )}
 
         {/* New section */}
         {(activeTab === "all" || activeTab === "new") && newVideos.length > 0 && (
-          <div className="mt-5 mb-6">
-            <div className="px-4 mb-3 flex items-center justify-between">
-              <div>
-                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>JUST DROPPED</p>
-                <h2 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.03em', color: '#fff' }}>New</h2>
-              </div>
-              <button onClick={() => setActiveTab("new")} style={{ color: '#E8001D', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em' }}>SEE ALL</button>
-            </div>
-            <div className="overflow-x-auto scrollbar-hide px-4">
-              <div className="flex gap-2">
-                {newVideos.slice(0, 10).map((v: Video) => (
-                  <div key={v.id} onClick={() => navigate(`/watch/${v.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 130 }}>
-                    <div className="relative overflow-hidden aspect-[2/3]" style={{ clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)' }}>
-                      {v.thumbnail_url ? (
-                        <img src={v.thumbnail_url} alt={v.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-zinc-900" />
-                      )}
-                      <div className="absolute top-1 left-1 px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest" style={{ backgroundColor: '#E8001D' }}>NEW</div>
-                    </div>
-                    <p className="text-[11px] font-bold mt-1 truncate">{v.title}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+          <div className="mt-7 mb-2">
+            <SectionHead eyebrow="JUST DROPPED" title="New" onSeeAll={() => setActiveTab("new")} />
+            <ScrollRow>
+              {newVideos.slice(0, 10).map((v: Video) => (
+                <PosterCard
+                  key={v.id}
+                  image={v.thumbnail_url}
+                  title={v.title}
+                  onClick={() => navigate(`/watch/${v.id}`)}
+                  badge={<span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest" style={{ backgroundColor: '#E8001D' }}>NEW</span>}
+                />
+              ))}
+            </ScrollRow>
+          </div>
+        )}
+
+        {/* Movies section */}
+        {(activeTab === "all" || activeTab === "movies") && movies.length > 0 && (
+          <div className="mt-7 mb-2">
+            <SectionHead eyebrow="WATCH NOW" title="Movies" onSeeAll={() => setActiveTab("movies")} />
+            <ScrollRow>
+              {movies.slice(0, 10).map((v: Video) => (
+                <PosterCard
+                  key={v.id}
+                  image={v.thumbnail_url}
+                  title={v.title}
+                  onClick={() => navigate(`/watch/${v.id}`)}
+                />
+              ))}
+            </ScrollRow>
           </div>
         )}
 
         {/* Clips section */}
         {(activeTab === "all" || activeTab === "clips") && clips.length > 0 && (
-          <div className="mt-5 mb-6">
-            <div className="px-4 mb-3 flex items-center justify-between">
-              <div>
-                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>SHORT FORM</p>
-                <h2 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.03em', color: '#fff' }}>Clips</h2>
-              </div>
-              <button onClick={() => setActiveTab("clips")} style={{ color: '#E8001D', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em' }}>SEE ALL</button>
-            </div>
-            <div className="overflow-x-auto scrollbar-hide px-4">
-              <div className="flex gap-2">
+          <div className="mt-7 mb-2">
+            <SectionHead eyebrow="SHORT FORM" title="Clips" onSeeAll={() => setActiveTab("clips")} />
+            <div className="overflow-x-auto scrollbar-hide">
+              <div className="flex gap-3 px-4">
                 {clips.slice(0, 10).map((v: Video) => (
-                  <div key={v.id} onClick={() => navigate(`/watch/${v.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 130 }}>
-                    <div className="relative overflow-hidden aspect-[9/16]" style={{ clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)' }}>
+                  <div key={v.id} onClick={() => navigate(`/watch/${v.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 120 }}>
+                    <div className="relative overflow-hidden" style={{ aspectRatio: '9/16', clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)' }}>
                       {v.thumbnail_url ? (
                         <img src={v.thumbnail_url} alt={v.title} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full bg-zinc-900" />
                       )}
                     </div>
-                    <p className="text-[11px] font-bold mt-1 truncate">{v.title}</p>
+                    <p className="text-[12px] font-semibold mt-1.5 truncate" style={{ color: 'rgba(255,255,255,0.85)' }}>{v.title}</p>
                   </div>
                 ))}
               </div>
