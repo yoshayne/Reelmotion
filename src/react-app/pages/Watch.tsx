@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router";
-import { useUser } from "@clerk/clerk-react";
+import { useUser, useClerk } from "@clerk/clerk-react";
 import MuxPlayerWrapper from "@/react-app/components/MuxPlayerWrapper";
 import { apiFetch } from "@/react-app/utils/api";
 import { hasAccess } from "@/react-app/utils/access";
@@ -30,6 +30,7 @@ function relativeTime(dateStr: string): string {
 
 function CommentSection({ videoId, isAdmin }: { videoId: number; isAdmin: boolean }) {
   const { user, isLoaded } = useUser();
+  const { openSignIn } = useClerk();
   const [comments, setComments] = useState<Comment[]>([]);
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -39,7 +40,7 @@ function CommentSection({ videoId, isAdmin }: { videoId: number; isAdmin: boolea
   const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    apiFetch(`/api/videos/${videoId}/comments?page=1&limit=20`)
+    apiFetch(`/api/videos/${videoId}/comments?page=1`)
       .then(r => r.json())
       .then(data => {
         setComments(data.comments ?? []);
@@ -52,7 +53,7 @@ function CommentSection({ videoId, isAdmin }: { videoId: number; isAdmin: boolea
 
   const loadMore = async () => {
     const next = page + 1;
-    const r = await apiFetch(`/api/videos/${videoId}/comments?page=${next}&limit=20`);
+    const r = await apiFetch(`/api/videos/${videoId}/comments?page=${next}`);
     const data = await r.json();
     setComments(prev => [...prev, ...(data.comments ?? [])]);
     setHasMore(data.hasMore ?? false);
@@ -128,7 +129,7 @@ function CommentSection({ videoId, isAdmin }: { videoId: number; isAdmin: boolea
         </div>
       ) : (
         <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.4)' }}>
-          <Link to="/sso-callback" className="font-bold text-white hover:text-red-500 transition-colors">Sign in</Link> to join the conversation
+          <button onClick={() => openSignIn()} className="font-bold text-white hover:text-red-500 transition-colors">Sign in</button> to join the conversation
         </p>
       )}
 

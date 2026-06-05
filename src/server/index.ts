@@ -1026,24 +1026,45 @@ app.get("/*", async (c) => {
 
 // ─── Comments ────────────────────────────────────────────────────────────────
 
-// GET /api/videos/:id/comments — public, paginated
+// GET /api/videos/:id/comments — public, paginated (optionally authenticated to resolve is_owner)
 app.get("/api/videos/:id/comments", async (c) => {
   const videoId = Number(c.req.param("id"));
-  const page = Math.max(0, Number(c.req.query("page") ?? 0));
+  const page = Math.max(1, Number(c.req.query("page") ?? 1));
   const limit = 20;
-  const offset = page * limit;
+  const offset = (page - 1) * limit;
+
+  // Resolve current user if token is present (best-effort — don't block unauthenticated requests)
+  let currentUserId: number | null = null;
+  const authHeader = c.req.header("Authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    try {
+      const { verifyToken } = await import("@clerk/backend");
+      const verified = await verifyToken(authHeader.slice(7), { secretKey: process.env.CLERK_SECRET_KEY! });
+      const userResult = await query<{ id: number }>("SELECT id FROM users WHERE clerk_user_id = $1", [verified.sub]);
+      if (userResult.rows[0]) currentUserId = userResult.rows[0].id;
+    } catch { /* unauthenticated — fine */ }
+  }
+
   const result = await query(
-    `SELECT c.id, c.body, c.created_at,
+    `SELECT c.id, c.body, c.created_at, c.user_id,
             u.display_name, u.avatar_url
      FROM comments c
      JOIN users u ON c.user_id = u.id
      WHERE c.video_id = $1
      ORDER BY c.created_at DESC
      LIMIT $2 OFFSET $3`,
-    [videoId, limit, offset]
+    [videoId, limit + 1, offset]
   );
+
+  const rows = result.rows;
+  const hasMore = rows.length > limit;
+  const comments = rows.slice(0, limit).map(row => ({
+    ...row,
+    is_owner: currentUserId !== null && row.user_id === currentUserId,
+  }));
+
   const countResult = await query("SELECT COUNT(*) FROM comments WHERE video_id = $1", [videoId]);
-  return c.json({ comments: result.rows, total: Number(countResult.rows[0].count) });
+  return c.json({ comments, total: Number(countResult.rows[0].count), hasMore });
 });
 
 // POST /api/videos/:id/comments — authenticated
@@ -1071,7 +1092,7 @@ app.post("/api/videos/:id/comments", clerkAuth, async (c) => {
      RETURNING id, body, created_at`,
     [videoId, user.id, text]
   );
-  const comment = { ...result.rows[0], display_name: user.display_name, avatar_url: user.avatar_url };
+  const comment = { ...result.rows[0], display_name: user.display_name, avatar_url: user.avatar_url, user_id: user.id, is_owner: true };
   return c.json(comment, 201);
 });
 
