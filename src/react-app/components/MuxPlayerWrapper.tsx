@@ -4,7 +4,7 @@ import type { Video } from "@/shared/types";
 interface MuxPlayerWrapperProps {
   video: Video;
   startTime?: number;
-  onTimeUpdate?: (currentTime: number) => void;
+  onTimeUpdate?: (currentTime: number, duration: number) => void;
   onEnded?: () => void;
   autoPlay?: boolean;
 }
@@ -21,7 +21,7 @@ declare module "react" {
         autoplay?: boolean;
         controls?: boolean;
         style?: React.CSSProperties;
-        ref?: React.Ref<HTMLElement & { currentTime: number; paused: boolean; play: () => void; pause: () => void }>;
+        ref?: React.Ref<HTMLElement & { currentTime: number; duration: number; paused: boolean; play: () => void; pause: () => void }>;
       }, HTMLElement>;
     }
   }
@@ -36,6 +36,7 @@ export default function MuxPlayerWrapper({
 }: MuxPlayerWrapperProps) {
   const playerRef = useRef<HTMLElement & {
     currentTime: number;
+    duration: number;
     paused: boolean;
     play: () => void;
     pause: () => void;
@@ -59,7 +60,8 @@ export default function MuxPlayerWrapper({
 
     const handleTimeUpdate = () => {
       const t = player.currentTime;
-      onTimeUpdate?.(t);
+      const d = player.duration || 0;
+      onTimeUpdate?.(t, d);
 
       if (
         video.intro_start_seconds != null &&
@@ -80,10 +82,10 @@ export default function MuxPlayerWrapper({
     player.addEventListener("timeupdate", handleTimeUpdate);
     player.addEventListener("ended", handleEnded);
 
-    // Sync progress every 10s
+    // Periodic sync so position saves even if timeupdate batching is inconsistent
     intervalRef.current = setInterval(() => {
       if (!player.paused) {
-        onTimeUpdate?.(player.currentTime);
+        onTimeUpdate?.(player.currentTime, player.duration || 0);
       }
     }, 10000);
 

@@ -254,8 +254,16 @@ export default function Browse() {
                       <div className="w-full h-full bg-zinc-900" />
                     )}
                     {item.last_position_seconds > 0 && (
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
-                        <div className="h-full" style={{ width: `${item.mux_duration ? Math.min(100, (item.last_position_seconds / item.mux_duration) * 100) : 0}%`, backgroundColor: '#E8001D' }} />
+                      <div className="absolute bottom-0 left-0 right-0 h-1" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
+                        <div
+                          className="h-full"
+                          style={{
+                            width: item.mux_duration > 0
+                              ? `${Math.min(100, (item.last_position_seconds / item.mux_duration) * 100)}%`
+                              : '30%',
+                            backgroundColor: '#E8001D',
+                          }}
+                        />
                       </div>
                     )}
                     {item.episode_number && (

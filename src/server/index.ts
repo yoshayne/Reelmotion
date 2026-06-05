@@ -550,6 +550,7 @@ app.post("/api/playback-history", clerkAuth, async (c) => {
     video_id: number;
     last_position_seconds: number;
     completed?: boolean;
+    mux_duration?: number;
   }>();
 
   await query(
@@ -559,6 +560,15 @@ app.post("/api/playback-history", clerkAuth, async (c) => {
        last_position_seconds = $3, completed = $4, updated_at = NOW()`,
     [user.id, body.video_id, body.last_position_seconds, body.completed ?? false]
   );
+
+  // Backfill mux_duration on the video record if the player reported it and it was missing
+  if (body.mux_duration && body.mux_duration > 0) {
+    await query(
+      `UPDATE videos SET mux_duration = $1 WHERE id = $2 AND (mux_duration IS NULL OR mux_duration = 0)`,
+      [body.mux_duration, body.video_id]
+    );
+  }
+
   return c.json({ success: true });
 });
 

@@ -53,18 +53,24 @@ export default function WatchPage() {
   }, [user, isLoaded, watchData]);
 
   const handleTimeUpdate = useCallback(
-    (time: number) => {
+    (time: number, duration: number) => {
       if (!user || !watchData) return;
       // Save at most once every 15 seconds to avoid hammering the DB
       const now = Date.now();
       if (now - lastSavedRef.current < 15_000) return;
       lastSavedRef.current = now;
-      const duration = watchData.video.mux_duration ?? 0;
-      const completed = duration > 0 && time / duration > 0.9;
+      // Use live duration from player; fall back to what's stored in the DB
+      const dur = duration > 0 ? duration : (watchData.video.mux_duration ?? 0);
+      const completed = dur > 0 && time / dur > 0.9;
       apiFetch("/api/playback-history", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ video_id: watchData.video.id, last_position_seconds: time, completed }),
+        body: JSON.stringify({
+          video_id: watchData.video.id,
+          last_position_seconds: time,
+          completed,
+          mux_duration: duration > 0 ? duration : undefined,
+        }),
       }).catch(() => {});
     },
     [user, watchData]
