@@ -45,7 +45,19 @@ export default function Browse() {
       setBrowseData(data);
       if (promo?.id) {
         setPromoPopup(promo);
-        setShowPromo(true);
+        const key = `promo_seen_${promo.id}`;
+        const lastSeen = localStorage.getItem(key);
+        let shouldShow = false;
+        if (promo.frequency === "always") {
+          shouldShow = true;
+        } else if (promo.frequency === "once_ever") {
+          shouldShow = !lastSeen;
+        } else {
+          // once_per_day — check if last seen was before today
+          const today = new Date().toDateString();
+          shouldShow = lastSeen !== today;
+        }
+        if (shouldShow) setShowPromo(true);
       }
       if (Array.isArray(wl)) setWatchlist(new Set((wl as any[]).map((i: any) => i.video_id || i.id)));
       if (Array.isArray(history) && history.length > 0) {
@@ -158,7 +170,12 @@ export default function Browse() {
 
       {/* Promo Popup */}
       {showPromo && promoPopup && (() => {
+        const markSeen = () => {
+          const key = `promo_seen_${promoPopup.id}`;
+          localStorage.setItem(key, new Date().toDateString());
+        };
         const handlePromoClick = () => {
+          markSeen();
           setShowPromo(false);
           if (promoPopup.link_type === "video" && promoPopup.link_video_id) {
             navigate(`/watch/${promoPopup.link_video_id}`);
@@ -172,9 +189,9 @@ export default function Browse() {
           promoPopup.link_video_id || promoPopup.link_series_id || promoPopup.link_custom_url
         ));
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setShowPromo(false)}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => { markSeen(); setShowPromo(false); }}>
             <div className="relative max-w-sm w-full" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setShowPromo(false)} className="absolute -top-3 -right-3 z-10 w-8 h-8 bg-black rounded-full flex items-center justify-center border border-white/20">
+              <button onClick={() => { markSeen(); setShowPromo(false); }} className="absolute -top-3 -right-3 z-10 w-8 h-8 bg-black rounded-full flex items-center justify-center border border-white/20">
                 <X className="w-4 h-4" />
               </button>
               {promoPopup.image_key && (
