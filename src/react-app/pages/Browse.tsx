@@ -157,38 +157,38 @@ export default function Browse() {
       <div className="fixed pointer-events-none" style={{ width: 220, height: 420, background: '#E8001D', opacity: 0.07, transform: 'rotate(18deg)', top: -60, right: -40, zIndex: 0 }} />
 
       {/* Promo Popup */}
-      {showPromo && promoPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setShowPromo(false)}>
-          <div className="relative max-w-sm w-full" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setShowPromo(false)} className="absolute -top-3 -right-3 z-10 w-8 h-8 bg-black rounded-full flex items-center justify-center border border-white/20">
-              <X className="w-4 h-4" />
-            </button>
-            {promoPopup.image_key && (() => {
-              const handleClick = () => {
-                setShowPromo(false);
-                if (promoPopup.link_type === "video" && promoPopup.link_video_id) {
-                  navigate(`/watch/${promoPopup.link_video_id}`);
-                } else if (promoPopup.link_type === "series" && promoPopup.link_series_id) {
-                  navigate(`/series/${promoPopup.link_series_id}`);
-                } else if (promoPopup.link_type === "custom" && promoPopup.link_custom_url) {
-                  window.open(promoPopup.link_custom_url, "_blank", "noopener");
-                }
-              };
-              const hasLink = promoPopup.link_type && (
-                promoPopup.link_video_id || promoPopup.link_series_id || promoPopup.link_custom_url
-              );
-              return (
+      {showPromo && promoPopup && (() => {
+        const handlePromoClick = () => {
+          setShowPromo(false);
+          if (promoPopup.link_type === "video" && promoPopup.link_video_id) {
+            navigate(`/watch/${promoPopup.link_video_id}`);
+          } else if (promoPopup.link_type === "series" && promoPopup.link_series_id) {
+            navigate(`/series/${promoPopup.link_series_id}`);
+          } else if (promoPopup.link_type === "custom" && promoPopup.link_custom_url) {
+            window.open(promoPopup.link_custom_url, "_blank", "noopener");
+          }
+        };
+        const hasLink = !!(promoPopup.link_type && (
+          promoPopup.link_video_id || promoPopup.link_series_id || promoPopup.link_custom_url
+        ));
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setShowPromo(false)}>
+            <div className="relative max-w-sm w-full" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setShowPromo(false)} className="absolute -top-3 -right-3 z-10 w-8 h-8 bg-black rounded-full flex items-center justify-center border border-white/20">
+                <X className="w-4 h-4" />
+              </button>
+              {promoPopup.image_key && (
                 <img
-                  src={`/api/images/${promoPopup.image_key}`}
+                  src={`/api/images/${encodeURIComponent(promoPopup.image_key)}`}
                   alt={promoPopup.title}
-                  onClick={hasLink ? handleClick : undefined}
-                  className={`w-full rounded-xl${hasLink ? " cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
+                  onClick={hasLink ? handlePromoClick : undefined}
+                  className={`w-full rounded-xl block${hasLink ? " cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
                 />
-              );
-            })()}
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Hero Section */}
       <div className="relative overflow-hidden" style={{ height: 380, marginTop: 56 }}>
