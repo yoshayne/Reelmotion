@@ -122,7 +122,7 @@ export default function SeriesPage() {
               <div className="space-y-3">
                 {seasonEpisodes.map((ep) => {
                   const canWatch = userHasAccess || ep.is_free;
-                  const epImage = ep.thumbnail_url || ep.carousel_image_url || ep.hero_image_url || imageUrl;
+                  const epImage = ep.hero_image_url || ep.thumbnail_url || ep.carousel_image_url || imageUrl;
                   return (
                     <div
                       key={ep.id}
