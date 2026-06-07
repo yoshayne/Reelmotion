@@ -1,0 +1,17 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.tv.reelmotion.app",
+        "paths": [
+          "/billing/success",
+          "/billing/success/*",
+          "/subscribe",
+          "/watch/*",
+          "/series/*"
+        ]
+      }
+    ]
+  }
+}

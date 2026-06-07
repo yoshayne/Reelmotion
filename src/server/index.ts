@@ -23,6 +23,19 @@ app.onError((err, c) => {
 app.use("/assets/*", serveStatic({ root: "./dist/client" }));
 app.use("/manifest.json", serveStatic({ root: "./dist/client" }));
 
+// ─── Universal Links / App Links (deep linking back into the native app) ────
+// Apple requires this served with no extension and Content-Type: application/json
+app.get("/.well-known/apple-app-site-association", async (c) => {
+  const fs = await import("node:fs");
+  const data = fs.readFileSync("./dist/client/.well-known/apple-app-site-association", "utf-8");
+  return c.body(data, 200, { "Content-Type": "application/json" });
+});
+app.get("/.well-known/assetlinks.json", async (c) => {
+  const fs = await import("node:fs");
+  const data = fs.readFileSync("./dist/client/.well-known/assetlinks.json", "utf-8");
+  return c.body(data, 200, { "Content-Type": "application/json" });
+});
+
 // ─── Clerk Webhook ──────────────────────────────────────────────────────────
 app.post("/api/webhooks/clerk", async (c) => {
   const payload = await c.req.text();
