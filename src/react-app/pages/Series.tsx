@@ -122,6 +122,7 @@ export default function SeriesPage() {
               <div className="space-y-3">
                 {seasonEpisodes.map((ep) => {
                   const canWatch = userHasAccess || ep.is_free;
+                  const epImage = ep.thumbnail_url || ep.carousel_image_url || ep.hero_image_url || imageUrl;
                   return (
                     <div
                       key={ep.id}
@@ -129,9 +130,9 @@ export default function SeriesPage() {
                       className="flex gap-3 p-3 bg-gray-900/50 border border-gray-800 rounded-xl cursor-pointer hover:border-red-600/40 transition-colors group"
                     >
                       <div className="relative flex-shrink-0 w-32 aspect-video rounded-lg overflow-hidden bg-gray-800">
-                        {ep.thumbnail_url ? (
+                        {epImage ? (
                           <img
-                            src={ep.thumbnail_url}
+                            src={epImage}
                             alt={ep.title}
                             className="w-full h-full object-cover"
                           />
