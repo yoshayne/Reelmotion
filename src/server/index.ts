@@ -10,6 +10,71 @@ import { stripe, createCheckoutSession, createPortalSession } from "./stripe.js"
 import { uploadFile, getPublicUrl, getSignedDownloadUrl, listFiles } from "./storage.js";
 import { getCached, invalidateCache, redis } from "./redis.js";
 import { runMigrations } from "./migrate.js";
+import cron from "node-cron";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
+
+// ─── Device activation helpers ───────────────────────────────────────────────
+
+function base64urlEncode(input: Buffer | string): string {
+  const buf = typeof input === "string" ? Buffer.from(input) : input;
+  return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+function signDeviceToken(payload: Record<string, unknown>): string {
+  const secret = process.env.DEVICE_JWT_SECRET ?? process.env.CLERK_SECRET_KEY!;
+  const header = base64urlEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const body = base64urlEncode(JSON.stringify(payload));
+  const sig = createHmac("sha256", secret).update(`${header}.${body}`).digest();
+  return `${header}.${body}.${base64urlEncode(sig)}`;
+}
+
+function verifyDeviceToken(token: string): Record<string, unknown> {
+  const secret = process.env.DEVICE_JWT_SECRET ?? process.env.CLERK_SECRET_KEY!;
+  const parts = token.split(".");
+  if (parts.length !== 3) throw new Error("Invalid token format");
+  const [header, payload, signature] = parts;
+  const expectedSig = base64urlEncode(
+    createHmac("sha256", secret).update(`${header}.${payload}`).digest()
+  );
+  if (signature !== expectedSig) throw new Error("Invalid signature");
+  const data = JSON.parse(Buffer.from(payload, "base64").toString()) as Record<string, unknown>;
+  if (typeof data.exp === "number" && data.exp < Math.floor(Date.now() / 1000)) {
+    throw new Error("Token expired");
+  }
+  return data;
+}
+
+function generateActivationCode(): string {
+  // Excludes easily confused characters (0/O, 1/I)
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = randomBytes(6);
+  let code = "";
+  for (let i = 0; i < 6; i++) code += chars[bytes[i] % chars.length];
+  return code;
+}
+
+async function checkActivateRateLimit(ip: string): Promise<boolean> {
+  const key = `device_activate_ratelimit:${ip}`;
+  try {
+    const count = await redis.incr(key);
+    if (count === 1) await redis.expire(key, 3600);
+    return count <= 10;
+  } catch {
+    return true; // fail open if Redis unavailable
+  }
+}
+
+async function checkPollRateLimit(deviceToken: string): Promise<boolean> {
+  const key = `device_poll_ratelimit:${deviceToken}`;
+  try {
+    const existing = await redis.get(key);
+    if (existing) return false;
+    await redis.setex(key, 5, "1");
+    return true;
+  } catch {
+    return true; // fail open if Redis unavailable
+  }
+}
 
 const app = new Hono();
 
@@ -1152,6 +1217,188 @@ app.get("/api/admin/comments", clerkAuth, adminAuth, async (c) => {
      LIMIT 500`
   );
   return c.json(result.rows);
+});
+
+// ─── TV Device Activation ────────────────────────────────────────────────────
+
+// Called by TV app on launch — issues a short code and opaque device token
+app.post("/api/auth/device/request-code", async (c) => {
+  const code = generateActivationCode();
+  const deviceToken = randomUUID();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  await query(
+    `INSERT INTO device_activation_codes (code, device_token, expires_at)
+     VALUES ($1, $2, $3)`,
+    [code, deviceToken, expiresAt.toISOString()]
+  );
+
+  return c.json({
+    code,
+    device_token: deviceToken,
+    activation_url: "https://reelmotionapp.com/activate",
+  });
+});
+
+// Called by TV app every 5 seconds while waiting for user to activate
+app.post("/api/auth/device/poll", async (c) => {
+  const body = await c.req.json<{ device_token?: string }>();
+  const deviceToken = body.device_token;
+  if (!deviceToken) return c.json({ error: "device_token required" }, 400);
+
+  const allowed = await checkPollRateLimit(deviceToken);
+  if (!allowed) return c.json({ error: "Too many requests" }, 429);
+
+  const result = await query(
+    `SELECT id, status, user_id, expires_at
+     FROM device_activation_codes
+     WHERE device_token = $1`,
+    [deviceToken]
+  );
+
+  if (result.rows.length === 0) return c.json({ error: "Not found" }, 404);
+
+  const record = result.rows[0] as {
+    id: number;
+    status: string;
+    user_id: number | null;
+    expires_at: string;
+  };
+
+  if (record.status === "pending" && new Date(record.expires_at) < new Date()) {
+    return c.json({ status: "expired" });
+  }
+
+  if (record.status === "pending") return c.json({ status: "pending" });
+  if (record.status === "expired") return c.json({ status: "expired" });
+
+  if (record.status === "activated" && record.user_id) {
+    const now = Math.floor(Date.now() / 1000);
+    const userResult = await query<{ id: number; role: string }>(
+      `SELECT id, role FROM users WHERE id = $1`,
+      [record.user_id]
+    );
+    if (userResult.rows.length === 0) return c.json({ status: "pending" });
+    const user = userResult.rows[0];
+
+    const sessionToken = signDeviceToken({
+      userId: user.id,
+      role: user.role,
+      type: "device",
+      iat: now,
+      exp: now + 90 * 24 * 60 * 60,
+    });
+
+    return c.json({ status: "activated", session_token: sessionToken });
+  }
+
+  return c.json({ status: record.status });
+});
+
+// Called by website when signed-in user enters the code shown on their TV
+app.post("/api/auth/device/activate", clerkAuth, async (c) => {
+  const user = c.get("user");
+  const ip =
+    c.req.header("x-forwarded-for")?.split(",")[0].trim() ??
+    c.req.header("x-real-ip") ??
+    "unknown";
+
+  const allowed = await checkActivateRateLimit(ip);
+  if (!allowed) {
+    return c.json({ error: "Too many attempts. Try again later." }, 429);
+  }
+
+  const body = await c.req.json<{ code?: string }>();
+  const code = body.code?.toUpperCase().trim();
+  if (!code) return c.json({ error: "code required" }, 400);
+
+  const result = await query(
+    `SELECT id, status FROM device_activation_codes
+     WHERE code = $1 AND expires_at > NOW()`,
+    [code]
+  );
+
+  if (result.rows.length === 0) {
+    return c.json({ error: "Code not found or expired" }, 404);
+  }
+
+  const record = result.rows[0] as { id: number; status: string };
+
+  if (record.status === "activated") {
+    return c.json({ error: "Code already used" }, 400);
+  }
+
+  await query(
+    `UPDATE device_activation_codes SET user_id = $1, status = 'activated' WHERE id = $2`,
+    [user.id, record.id]
+  );
+
+  return c.json({ success: true, message: "TV successfully linked to your account" });
+});
+
+// Called by TV app on every launch using the stored session token
+app.get("/api/auth/device/verify", async (c) => {
+  const authHeader = c.req.header("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  let payload: Record<string, unknown>;
+  try {
+    payload = verifyDeviceToken(authHeader.slice(7));
+  } catch {
+    return c.json({ error: "Invalid or expired token" }, 401);
+  }
+
+  if (payload.type !== "device") {
+    return c.json({ error: "Invalid token type" }, 401);
+  }
+
+  const result = await query(
+    `SELECT u.id, u.email, u.role, u.display_name, u.avatar_url,
+            s.plan, s.status AS subscription_status, s.period_end_date
+     FROM users u
+     LEFT JOIN subscriptions s ON s.user_id = u.id
+     WHERE u.id = $1`,
+    [payload.userId as number]
+  );
+
+  if (result.rows.length === 0) return c.json({ error: "User not found" }, 401);
+
+  const u = result.rows[0] as {
+    id: number;
+    email: string;
+    role: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    plan: string | null;
+    subscription_status: string | null;
+    period_end_date: string | null;
+  };
+
+  return c.json({
+    id: u.id,
+    email: u.email,
+    role: u.role,
+    display_name: u.display_name,
+    avatar_url: u.avatar_url,
+    subscription: {
+      plan: u.plan,
+      status: u.subscription_status,
+      period_end_date: u.period_end_date,
+    },
+  });
+});
+
+// Cleanup expired pending codes every 15 minutes
+cron.schedule("*/15 * * * *", async () => {
+  try {
+    await pool.query(
+      `DELETE FROM device_activation_codes WHERE expires_at < NOW() AND status = 'pending'`
+    );
+  } catch (err) {
+    console.error("Device code cleanup error:", err);
+  }
 });
 
 // ─── SPA fallback ────────────────────────────────────────────────────────────

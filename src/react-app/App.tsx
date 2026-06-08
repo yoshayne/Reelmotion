@@ -36,6 +36,7 @@ import ContestTerms from "@/react-app/pages/ContestTerms";
 import SSOCallback from "@/react-app/pages/SSOCallback";
 import CommunityGuidelines from "@/react-app/pages/CommunityGuidelines";
 import AdminComments from "@/react-app/pages/admin/AdminComments";
+import ActivateTVPage from "@/react-app/pages/ActivateTV";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -98,6 +99,7 @@ export default function App() {
           <Route path="/auth-callback" element={<SSOCallback />} />
           <Route path="/community-guidelines" element={<CommunityGuidelines />} />
           <Route path="/admin/comments" element={<AdminComments />} />
+          <Route path="/activate" element={<ActivateTVPage />} />
         </Routes>
         </Layout>
       </Router>
