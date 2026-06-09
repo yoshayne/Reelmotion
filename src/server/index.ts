@@ -76,6 +76,28 @@ async function checkPollRateLimit(deviceToken: string): Promise<boolean> {
   }
 }
 
+// ─── Browse-data helpers ─────────────────────────────────────────────────────
+
+function formatDuration(seconds: number | null | undefined): string {
+  if (!seconds || seconds <= 0) return "";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function formatVideoForBrowse(v: Record<string, unknown>) {
+  return {
+    id: v.id,
+    title: v.title,
+    thumbnail: v.thumbnail_url,
+    rating: v.content_rating ?? null,
+    duration: formatDuration(v.mux_duration as number | null),
+    mux_playback_id: v.mux_playback_id,
+    is_free: v.is_free,
+    series_id: v.series_id ?? null,
+  };
+}
+
 const app = new Hono();
 
 // ─── Global error handler — always return JSON ───────────────────────────────
@@ -328,31 +350,73 @@ app.get("/api/carousel", async (c) => {
 
 app.get("/api/browse-data", async (c) => {
   try {
-    const data = await getCached("browse-data", 300, async () => {
+    // Static data (categories+videos, series, carousel) cached 5 minutes
+    const staticData = await getCached("browse-data", 300, async () => {
       const [videos, series, categories, carousel] = await Promise.all([
         query(
-          `SELECT v.*, s.title as series_title
-           FROM videos v
-           LEFT JOIN series s ON v.series_id = s.id
-           WHERE v.is_published = true
-           ORDER BY v.release_date DESC NULLS LAST, v.created_at DESC`
+          `SELECT id, title, thumbnail_url, content_rating, mux_duration,
+                  mux_playback_id, is_free, series_id, category_id
+           FROM videos
+           WHERE is_published = true
+           ORDER BY release_date DESC NULLS LAST, created_at DESC`
         ),
         query(`SELECT * FROM series ORDER BY created_at DESC`),
-        query(`SELECT * FROM categories ORDER BY sort_order ASC, name ASC`).catch(() => ({ rows: [] })),
-        query(`SELECT * FROM carousel_items WHERE is_active = true ORDER BY display_order ASC`).catch(() => ({ rows: [] })),
+        query(`SELECT id, name, slug FROM categories ORDER BY sort_order ASC, name ASC`)
+          .catch(() => ({ rows: [] as { id: number; name: string; slug: string }[] })),
+        query(`SELECT * FROM carousel_items WHERE is_active = true ORDER BY display_order ASC`)
+          .catch(() => ({ rows: [] })),
       ]);
 
+      const allVideos = videos.rows as Record<string, unknown>[];
+      const categoriesWithVideos = (categories.rows as { id: number; name: string; slug: string }[]).map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+        videos: allVideos.filter(v => v.category_id === cat.id).map(formatVideoForBrowse),
+      }));
+
       return {
-        videos: videos.rows,
+        categories: categoriesWithVideos,
         series: series.rows,
-        categories: categories.rows,
         carousel: carousel.rows,
       };
     });
-    return c.json(data);
+
+    // continue_watching — user-specific, fetched per request
+    let continueWatching: unknown[] = [];
+    const authHeader = c.req.header("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      try {
+        const { verifyToken } = await import("@clerk/backend");
+        const verified = await verifyToken(authHeader.slice(7), { secretKey: process.env.CLERK_SECRET_KEY! });
+        const userResult = await query<{ id: number }>(
+          "SELECT id FROM users WHERE clerk_user_id = $1",
+          [verified.sub]
+        );
+        if (userResult.rows[0]) {
+          const historyResult = await query(
+            `SELECT v.id, v.title, v.thumbnail_url, v.content_rating, v.mux_duration,
+                    v.mux_playback_id, v.is_free, v.series_id,
+                    ph.last_position_seconds
+             FROM playback_history ph
+             JOIN videos v ON ph.video_id = v.id
+             WHERE ph.user_id = $1 AND v.is_published = true AND ph.completed = false
+             ORDER BY ph.updated_at DESC
+             LIMIT 20`,
+            [userResult.rows[0].id]
+          );
+          continueWatching = (historyResult.rows as Record<string, unknown>[]).map(v => ({
+            ...formatVideoForBrowse(v),
+            last_position_seconds: v.last_position_seconds,
+          }));
+        }
+      } catch { /* unauthenticated or expired token — return empty */ }
+    }
+
+    return c.json({ continue_watching: continueWatching, ...staticData });
   } catch (err) {
     console.error("browse-data error:", err);
-    return c.json({ videos: [], series: [], categories: [], carousel: [] });
+    return c.json({ continue_watching: [], categories: [], series: [], carousel: [] });
   }
 });
 
@@ -1110,45 +1174,21 @@ app.delete("/api/admin/promo-popups/:id", clerkAuth, adminAuth, async (c) => {
 
 // ─── Comments ────────────────────────────────────────────────────────────────
 
-// GET /api/videos/:id/comments — public, paginated (optionally authenticated to resolve is_owner)
+// GET /api/videos/:id/comments — public, returns array directly
 app.get("/api/videos/:id/comments", async (c) => {
   const videoId = Number(c.req.param("id"));
-  const page = Math.max(1, Number(c.req.query("page") ?? 1));
-  const limit = 20;
-  const offset = (page - 1) * limit;
-
-  // Resolve current user if token is present (best-effort — don't block unauthenticated requests)
-  let currentUserId: number | null = null;
-  const authHeader = c.req.header("Authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    try {
-      const { verifyToken } = await import("@clerk/backend");
-      const verified = await verifyToken(authHeader.slice(7), { secretKey: process.env.CLERK_SECRET_KEY! });
-      const userResult = await query<{ id: number }>("SELECT id FROM users WHERE clerk_user_id = $1", [verified.sub]);
-      if (userResult.rows[0]) currentUserId = userResult.rows[0].id;
-    } catch { /* unauthenticated — fine */ }
-  }
 
   const result = await query(
-    `SELECT c.id, c.body, c.created_at, c.user_id,
+    `SELECT c.id, c.body, c.created_at,
             u.display_name, u.avatar_url
      FROM comments c
      JOIN users u ON c.user_id = u.id
      WHERE c.video_id = $1
-     ORDER BY c.created_at DESC
-     LIMIT $2 OFFSET $3`,
-    [videoId, limit + 1, offset]
+     ORDER BY c.created_at DESC`,
+    [videoId]
   );
 
-  const rows = result.rows;
-  const hasMore = rows.length > limit;
-  const comments = rows.slice(0, limit).map(row => ({
-    ...row,
-    is_owner: currentUserId !== null && row.user_id === currentUserId,
-  }));
-
-  const countResult = await query("SELECT COUNT(*) FROM comments WHERE video_id = $1", [videoId]);
-  return c.json({ comments, total: Number(countResult.rows[0].count), hasMore });
+  return c.json(result.rows);
 });
 
 // POST /api/videos/:id/comments — authenticated + active subscription required
@@ -1355,8 +1395,8 @@ app.get("/api/auth/device/verify", async (c) => {
   }
 
   const result = await query(
-    `SELECT u.id, u.email, u.role, u.display_name, u.avatar_url,
-            s.plan, s.status AS subscription_status, s.period_end_date
+    `SELECT u.id, u.email, u.display_name,
+            s.status AS subscription_status, s.period_end_date
      FROM users u
      LEFT JOIN subscriptions s ON s.user_id = u.id
      WHERE u.id = $1`,
@@ -1368,25 +1408,23 @@ app.get("/api/auth/device/verify", async (c) => {
   const u = result.rows[0] as {
     id: number;
     email: string;
-    role: string;
     display_name: string | null;
-    avatar_url: string | null;
-    plan: string | null;
     subscription_status: string | null;
     period_end_date: string | null;
   };
 
+  const subscriptionActive =
+    u.subscription_status === "active" &&
+    u.period_end_date != null &&
+    new Date(u.period_end_date) > new Date();
+
   return c.json({
-    id: u.id,
-    email: u.email,
-    role: u.role,
-    display_name: u.display_name,
-    avatar_url: u.avatar_url,
-    subscription: {
-      plan: u.plan,
-      status: u.subscription_status,
-      period_end_date: u.period_end_date,
+    user: {
+      id: u.id,
+      display_name: u.display_name,
+      email: u.email,
     },
+    subscription_active: subscriptionActive,
   });
 });
 
