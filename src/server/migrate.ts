@@ -295,5 +295,20 @@ export async function runMigrations() {
   `);
   await query(`CREATE INDEX IF NOT EXISTS idx_comments_video_id ON comments(video_id)`);
 
+  // Device activation codes (for TV app linking)
+  await query(`
+    CREATE TABLE IF NOT EXISTS device_activation_codes (
+      id SERIAL PRIMARY KEY,
+      code TEXT NOT NULL UNIQUE,
+      device_token TEXT NOT NULL UNIQUE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'pending',
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_device_codes_code ON device_activation_codes(code)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_device_codes_status ON device_activation_codes(status)`);
+
   console.log("DB migrations complete.");
 }
