@@ -9,6 +9,9 @@ redis.on("error", (err: Error) => {
   console.error("Redis error:", err);
 });
 
+redis.on("connect", () => console.log("Redis connected"));
+redis.on("reconnecting", () => console.log("Redis reconnecting..."));
+
 export async function getCached<T>(
   key: string,
   ttlSeconds: number,

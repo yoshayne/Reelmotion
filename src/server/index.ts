@@ -1,3 +1,14 @@
+// ─── Global error handlers — must be first ──────────────────────────────────
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err);
+  console.error(err.stack);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("UNHANDLED REJECTION at:", promise);
+  console.error("Reason:", reason);
+});
+
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
@@ -1429,15 +1440,19 @@ app.get("/api/auth/device/verify", async (c) => {
 });
 
 // Cleanup expired pending codes every 15 minutes
-cron.schedule("*/15 * * * *", async () => {
-  try {
-    await pool.query(
-      `DELETE FROM device_activation_codes WHERE expires_at < NOW() AND status = 'pending'`
-    );
-  } catch (err) {
-    console.error("Device code cleanup error:", err);
-  }
-});
+try {
+  cron.schedule("*/15 * * * *", async () => {
+    try {
+      await pool.query(
+        `DELETE FROM device_activation_codes WHERE expires_at < NOW() AND status = 'pending'`
+      );
+    } catch (err) {
+      console.error("Device code cleanup error:", err);
+    }
+  });
+} catch (err) {
+  console.error("Failed to register cron job:", err);
+}
 
 // ─── SPA fallback ────────────────────────────────────────────────────────────
 // Any unhandled /api/* request returns JSON 404 — never falls through to HTML
@@ -1452,20 +1467,33 @@ app.get("/*", async (c) => {
 // ─── Start server ────────────────────────────────────────────────────────────
 const port = Number(process.env.PORT) || 3000;
 
-runMigrations()
-  .then(() => {
-    // Ensure admin accounts have correct role after migrations
+async function startServer() {
+  try {
+    await runMigrations();
+  } catch (err) {
+    console.error("Migration error (non-fatal, continuing):", err);
+  }
+
+  try {
     const ADMIN_EMAILS = ["romediastudios@gmail.com"];
-    return query(
+    await query(
       `UPDATE users SET role = 'admin' WHERE email = ANY($1::text[]) AND role != 'admin'`,
       [ADMIN_EMAILS]
     );
-  })
-  .catch((err) => console.error("Migration error:", err))
-  .finally(() => {
+  } catch (err) {
+    console.error("Admin role sync error (non-fatal, continuing):", err);
+  }
+
+  try {
     serve({ fetch: app.fetch, port }, () => {
       console.log(`ReelMotion server running on port ${port}`);
     });
-  });
+  } catch (err) {
+    console.error("FATAL: Failed to start HTTP server:", err);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 export default app;
