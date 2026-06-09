@@ -191,7 +191,7 @@ app.post("/api/webhooks/clerk", async (c) => {
       );
     } else if (type === "user.updated") {
       await query(
-        `UPDATE users SET email = $2, role = CASE WHEN email = ANY($6::text[]) THEN 'admin' ELSE role END,
+        `UPDATE users SET email = $2, role = CASE WHEN email = ANY($5::text[]) THEN 'admin' ELSE role END,
          display_name = $3, avatar_url = $4, updated_at = NOW()
          WHERE clerk_user_id = $1`,
         [
@@ -199,7 +199,6 @@ app.post("/api/webhooks/clerk", async (c) => {
           primaryEmail,
           [data.first_name, data.last_name].filter(Boolean).join(" ") || null,
           data.image_url,
-          null,
           ADMIN_EMAILS,
         ]
       );
