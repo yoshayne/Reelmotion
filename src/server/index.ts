@@ -1270,6 +1270,96 @@ app.get("/api/admin/comments", clerkAuth, adminAuth, async (c) => {
   return c.json(result.rows);
 });
 
+// ─── Password management (for TV device sign-in) ─────────────────────────────
+
+// Check whether the signed-in user has a password set on their Clerk account
+app.get("/api/auth/password-status", clerkAuth, async (c) => {
+  const user = c.get("user");
+  try {
+    const clerkUser = await clerk.users.getUser(user.clerk_user_id);
+    return c.json({ hasPassword: clerkUser.passwordEnabled });
+  } catch (err) {
+    console.error("password-status error:", err);
+    return c.json({ error: "Failed to check password status" }, 500);
+  }
+});
+
+// Set (or change) a password on the signed-in user's Clerk account
+app.post("/api/auth/set-password", clerkAuth, async (c) => {
+  const user = c.get("user");
+  const body = await c.req.json<{ password?: string; confirmPassword?: string }>();
+  const { password, confirmPassword } = body;
+
+  if (!password || password.length < 8) {
+    return c.json({ error: "Password must be at least 8 characters" }, 400);
+  }
+  if (password !== confirmPassword) {
+    return c.json({ error: "Passwords do not match" }, 400);
+  }
+
+  try {
+    await clerk.users.updateUser(user.clerk_user_id, { password });
+    return c.json({ success: true, message: "Password set successfully" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to set password";
+    return c.json({ error: message }, 400);
+  }
+});
+
+// Email + password sign-in for TV devices that can't do OAuth redirects
+app.post("/api/auth/device/signin", async (c) => {
+  const body = await c.req.json<{ email?: string; password?: string }>();
+  const { email, password } = body;
+
+  if (!email || !password) {
+    return c.json({ error: "Invalid email or password" }, 401);
+  }
+
+  // Look up user in our DB — same 401 for both "not found" and "wrong password"
+  // to avoid leaking which emails are registered
+  const userResult = await query<{
+    id: number;
+    clerk_user_id: string;
+    display_name: string | null;
+    email: string;
+    role: string;
+  }>(
+    `SELECT id, clerk_user_id, display_name, email, role
+     FROM users WHERE email = $1 LIMIT 1`,
+    [email.toLowerCase().trim()]
+  );
+
+  if (userResult.rows.length === 0) {
+    return c.json({ error: "Invalid email or password" }, 401);
+  }
+
+  const dbUser = userResult.rows[0];
+
+  try {
+    await clerk.users.verifyPassword({ userId: dbUser.clerk_user_id, password });
+  } catch {
+    return c.json({ error: "Invalid email or password" }, 401);
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const sessionToken = signDeviceToken({
+    userId: dbUser.id,
+    role: dbUser.role,
+    type: "device",
+    iat: now,
+    exp: now + 90 * 24 * 60 * 60,
+  });
+
+  return c.json({
+    sessionToken,
+    user: {
+      id: dbUser.id,
+      display_name: dbUser.display_name,
+      email: dbUser.email,
+    },
+  });
+});
+
 // ─── TV Device Activation ────────────────────────────────────────────────────
 
 // Called by TV app on launch — issues a short code and opaque device token

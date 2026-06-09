@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useUser, useClerk } from "@clerk/clerk-react";
 import { useNavigate, Link } from "react-router";
-import { Camera, CheckCircle, ExternalLink, LogOut, Crown, User } from "lucide-react";
+import { Camera, CheckCircle, ExternalLink, LogOut, Crown, User, Tv } from "lucide-react";
 import { apiFetch, apiFetchForm } from "@/react-app/utils/api";
 import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
 import { hasAccess } from "@/react-app/utils/access";
@@ -31,6 +31,15 @@ export default function AccountPage() {
   const [userRole, setUserRole] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // TV password state
+  const [hasPassword, setHasPassword] = useState<boolean | null>(null);
+  const [showPwForm, setShowPwForm] = useState(false);
+  const [pwPassword, setPwPassword] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwSuccess, setPwSuccess] = useState("");
+  const [pwError, setPwError] = useState("");
+
   useEffect(() => {
     if (isLoaded && !user) navigate("/");
   }, [isLoaded, user, navigate]);
@@ -52,6 +61,11 @@ export default function AccountPage() {
         setSubscription(data.subscription);
         setUserRole(data.role || "");
       });
+
+    apiFetch("/api/auth/password-status")
+      .then((r) => r.json() as Promise<{ hasPassword: boolean }>)
+      .then((data) => setHasPassword(data.hasPassword))
+      .catch(() => setHasPassword(false));
   }, [user?.id]);
 
   const handleSave = async () => {
@@ -88,6 +102,33 @@ export default function AccountPage() {
   const handleLogout = async () => {
     await signOut();
     window.location.href = "/";
+  };
+
+  const handleSetPassword = async () => {
+    setPwError("");
+    setPwSuccess("");
+    if (pwPassword.length < 8) { setPwError("Password must be at least 8 characters"); return; }
+    if (pwPassword !== pwConfirm) { setPwError("Passwords do not match"); return; }
+    setPwSaving(true);
+    try {
+      const res = await apiFetch("/api/auth/set-password", {
+        method: "POST",
+        body: JSON.stringify({ password: pwPassword, confirmPassword: pwConfirm }),
+      });
+      const data = await res.json() as { success?: boolean; error?: string };
+      if (res.ok) {
+        setHasPassword(true);
+        setShowPwForm(false);
+        setPwPassword("");
+        setPwConfirm("");
+        setPwSuccess("Password set successfully — you can now sign in on TV devices");
+      } else {
+        setPwError(data.error ?? "Failed to set password");
+      }
+    } catch {
+      setPwError("Network error. Please try again.");
+    }
+    setPwSaving(false);
   };
 
   const userHasAccess = hasAccess(subscription);
@@ -222,6 +263,99 @@ export default function AccountPage() {
               </span>
             </button>
           </div>
+        </div>
+
+        {/* TV & Device Sign In */}
+        <div className="rounded-xl p-5 mb-4" style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <Tv className="w-4 h-4" style={{ color: '#E8001D' }} />
+            <h2 className="font-black tracking-tight">TV &amp; Device Sign In</h2>
+          </div>
+          <p className="text-xs mb-4" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            Set a password to sign in on Roku, Fire TV, and other TV devices that don't support Google sign-in.
+          </p>
+
+          {pwSuccess && (
+            <div className="flex items-center gap-2 mb-3 text-sm" style={{ color: '#4ade80' }}>
+              <CheckCircle className="w-4 h-4 flex-shrink-0" />
+              {pwSuccess}
+            </div>
+          )}
+
+          {hasPassword && !showPwForm ? (
+            <div className="flex items-center justify-between">
+              <span className="text-sm flex items-center gap-1.5" style={{ color: '#4ade80' }}>
+                <CheckCircle className="w-4 h-4" /> Password set
+              </span>
+              <button
+                onClick={() => { setShowPwForm(true); setPwSuccess(""); setPwError(""); }}
+                className="text-xs font-bold tracking-widest uppercase transition-colors"
+                style={{ color: 'rgba(255,255,255,0.5)' }}
+              >
+                Change Password
+              </button>
+            </div>
+          ) : !showPwForm ? (
+            <button
+              onClick={() => { setShowPwForm(true); setPwError(""); }}
+              style={{ transform: 'skewX(-8deg)', backgroundColor: '#E8001D', padding: '10px 24px', display: 'inline-block' }}
+            >
+              <span className="font-extrabold text-xs tracking-[0.1em] uppercase" style={{ transform: 'skewX(8deg)', display: 'block' }}>
+                Set Password
+              </span>
+            </button>
+          ) : null}
+
+          {showPwForm && (
+            <div className="space-y-3 mt-2">
+              <div>
+                <label className="block text-xs font-bold tracking-widest uppercase mb-1.5" style={{ color: 'rgba(255,255,255,0.35)' }}>New Password</label>
+                <input
+                  type="password"
+                  value={pwPassword}
+                  onChange={(e) => setPwPassword(e.target.value)}
+                  placeholder="Min 8 characters"
+                  className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none transition-colors"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = '#E8001D'; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold tracking-widest uppercase mb-1.5" style={{ color: 'rgba(255,255,255,0.35)' }}>Confirm Password</label>
+                <input
+                  type="password"
+                  value={pwConfirm}
+                  onChange={(e) => setPwConfirm(e.target.value)}
+                  placeholder="Re-enter password"
+                  className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none transition-colors"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = '#E8001D'; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; }}
+                />
+              </div>
+              {pwError && <p className="text-sm" style={{ color: '#f87171' }}>{pwError}</p>}
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={handleSetPassword}
+                  disabled={pwSaving}
+                  style={{ transform: 'skewX(-8deg)', backgroundColor: pwSaving ? 'rgba(100,100,100,0.6)' : '#E8001D', padding: '10px 24px', display: 'inline-block' }}
+                >
+                  <span className="font-extrabold text-xs tracking-[0.1em] uppercase" style={{ transform: 'skewX(8deg)', display: 'block' }}>
+                    {pwSaving ? "Saving…" : "Save Password"}
+                  </span>
+                </button>
+                <button
+                  onClick={() => { setShowPwForm(false); setPwPassword(""); setPwConfirm(""); setPwError(""); }}
+                  style={{ transform: 'skewX(-8deg)', border: '1px solid rgba(255,255,255,0.15)', padding: '10px 20px', display: 'inline-block', backgroundColor: 'transparent' }}
+                >
+                  <span className="font-extrabold text-xs tracking-[0.1em] uppercase" style={{ transform: 'skewX(8deg)', display: 'block', color: 'rgba(255,255,255,0.5)' }}>
+                    Cancel
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Membership */}
