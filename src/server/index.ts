@@ -1440,6 +1440,8 @@ cron.schedule("*/15 * * * *", async () => {
 });
 
 // ─── SPA fallback ────────────────────────────────────────────────────────────
+// Any unhandled /api/* request returns JSON 404 — never falls through to HTML
+app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));
 app.use("/*", serveStatic({ root: "./dist/client" }));
 app.get("/*", async (c) => {
   return c.html(
