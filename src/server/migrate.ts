@@ -257,7 +257,7 @@ export async function runMigrations() {
     `ALTER TABLE brand_assets ADD COLUMN IF NOT EXISTS file_key TEXT DEFAULT ''`,
     `ALTER TABLE brand_assets ADD COLUMN IF NOT EXISTS content_type TEXT`,
     `ALTER TABLE brand_assets ADD COLUMN IF NOT EXISTS file_size BIGINT`,
-    `ALTER TABLE brand_assets ALTER COLUMN url SET DEFAULT ''`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='brand_assets' AND column_name='url') THEN ALTER TABLE brand_assets ALTER COLUMN url SET DEFAULT ''; END IF; END $$`,
     `ALTER TABLE contest_submissions ADD COLUMN IF NOT EXISTS film_title TEXT`,
     `ALTER TABLE contest_submissions ADD COLUMN IF NOT EXISTS runtime TEXT`,
     `ALTER TABLE contest_submissions ADD COLUMN IF NOT EXISTS genre TEXT`,
