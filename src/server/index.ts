@@ -1495,7 +1495,7 @@ app.get("/api/auth/device/verify", async (c) => {
   }
 
   const result = await query(
-    `SELECT u.id, u.email, u.display_name,
+    `SELECT u.id, u.email, u.display_name, u.role,
             s.status AS subscription_status, s.period_end_date
      FROM users u
      LEFT JOIN subscriptions s ON s.user_id = u.id
@@ -1509,14 +1509,19 @@ app.get("/api/auth/device/verify", async (c) => {
     id: number;
     email: string;
     display_name: string | null;
+    role: string;
     subscription_status: string | null;
     period_end_date: string | null;
   };
 
   const subscriptionActive =
-    u.subscription_status === "active" &&
-    u.period_end_date != null &&
-    new Date(u.period_end_date) > new Date();
+    u.role === "admin" ||
+    u.role === "creator" ||
+    u.subscription_status === "active" ||
+    u.subscription_status === "trialing" ||
+    (u.subscription_status === "canceled" &&
+      u.period_end_date != null &&
+      new Date(u.period_end_date) > new Date());
 
   return c.json({
     user: {
