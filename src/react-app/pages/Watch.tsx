@@ -35,30 +35,13 @@ function CommentSection({ videoId, isAdmin, canComment }: { videoId: number; isA
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    apiFetch(`/api/videos/${videoId}/comments?page=1`)
+    apiFetch(`/api/videos/${videoId}/comments`)
       .then(r => r.json())
-      .then(data => {
-        setComments(data.comments ?? []);
-        setTotal(data.total ?? 0);
-        setHasMore(data.hasMore ?? false);
-        setPage(1);
-      })
+      .then(data => setComments(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, [videoId]);
-
-  const loadMore = async () => {
-    const next = page + 1;
-    const r = await apiFetch(`/api/videos/${videoId}/comments?page=${next}`);
-    const data = await r.json();
-    setComments(prev => [...prev, ...(data.comments ?? [])]);
-    setHasMore(data.hasMore ?? false);
-    setPage(next);
-  };
 
   const handleSubmit = async () => {
     if (!body.trim() || submitting) return;
@@ -77,7 +60,6 @@ function CommentSection({ videoId, isAdmin, canComment }: { videoId: number; isA
       }
       const newComment = await r.json();
       setComments(prev => [newComment, ...prev]);
-      setTotal(t => t + 1);
       setBody("");
     } finally {
       setSubmitting(false);
@@ -88,14 +70,13 @@ function CommentSection({ videoId, isAdmin, canComment }: { videoId: number; isA
     if (!confirm("Delete this comment?")) return;
     await apiFetch(`/api/comments/${id}`, { method: "DELETE" });
     setComments(prev => prev.filter(c => c.id !== id));
-    setTotal(t => t - 1);
   };
 
   if (!isLoaded) return null;
 
   return (
     <div className="mt-10">
-      <h2 className="text-lg font-black mb-4">{total > 0 ? `${total} Comment${total !== 1 ? "s" : ""}` : "Comments"}</h2>
+      <h2 className="text-lg font-black mb-4">{comments.length > 0 ? `${comments.length} Comment${comments.length !== 1 ? "s" : ""}` : "Comments"}</h2>
 
       {!user ? (
         /* Not signed in */
@@ -191,16 +172,6 @@ function CommentSection({ videoId, isAdmin, canComment }: { videoId: number; isA
           );
         })}
       </div>
-
-      {hasMore && (
-        <button
-          onClick={loadMore}
-          className="mt-6 w-full py-2.5 text-sm font-bold rounded-xl border border-gray-700 hover:border-gray-500 transition-colors"
-          style={{ color: 'rgba(255,255,255,0.5)' }}
-        >
-          Load more comments
-        </button>
-      )}
 
       {comments.length === 0 && (
         <p className="text-sm py-6 text-center" style={{ color: 'rgba(255,255,255,0.25)' }}>No comments yet. Be the first!</p>

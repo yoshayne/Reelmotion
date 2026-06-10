@@ -364,11 +364,11 @@ app.get("/api/browse-data", async (c) => {
     const staticData = await getCached("browse-data", 300, async () => {
       const [videos, series, categories, carousel] = await Promise.all([
         query(
-          `SELECT id, title, thumbnail_url, content_rating, mux_duration,
-                  mux_playback_id, is_free, series_id, category_id
-           FROM videos
-           WHERE is_published = true
-           ORDER BY release_date DESC NULLS LAST, created_at DESC`
+          `SELECT v.*, s.title as series_title
+           FROM videos v
+           LEFT JOIN series s ON v.series_id = s.id
+           WHERE v.is_published = true
+           ORDER BY v.release_date DESC NULLS LAST, v.created_at DESC`
         ),
         query(`SELECT * FROM series ORDER BY created_at DESC`),
         query(`SELECT id, name, slug FROM categories ORDER BY sort_order ASC, name ASC`)
@@ -386,6 +386,7 @@ app.get("/api/browse-data", async (c) => {
       }));
 
       return {
+        videos: allVideos,
         categories: categoriesWithVideos,
         series: series.rows,
         carousel: carousel.rows,
@@ -426,7 +427,7 @@ app.get("/api/browse-data", async (c) => {
     return c.json({ continue_watching: continueWatching, ...staticData });
   } catch (err) {
     console.error("browse-data error:", err);
-    return c.json({ continue_watching: [], categories: [], series: [], carousel: [] });
+    return c.json({ continue_watching: [], videos: [], categories: [], series: [], carousel: [] });
   }
 });
 
@@ -1189,7 +1190,7 @@ app.get("/api/videos/:id/comments", async (c) => {
   const videoId = Number(c.req.param("id"));
 
   const result = await query(
-    `SELECT c.id, c.body, c.created_at,
+    `SELECT c.id, c.body, c.created_at, c.user_id,
             u.display_name, u.avatar_url
      FROM comments c
      JOIN users u ON c.user_id = u.id
@@ -1198,7 +1199,27 @@ app.get("/api/videos/:id/comments", async (c) => {
     [videoId]
   );
 
-  return c.json(result.rows);
+  // Optional auth — mark which comments belong to the requesting user
+  let currentUserId: number | null = null;
+  const authHeader = c.req.header("Authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    try {
+      const { verifyToken } = await import("@clerk/backend");
+      const verified = await verifyToken(authHeader.slice(7), { secretKey: process.env.CLERK_SECRET_KEY! });
+      const userResult = await query<{ id: number }>(
+        "SELECT id FROM users WHERE clerk_user_id = $1",
+        [verified.sub]
+      );
+      currentUserId = userResult.rows[0]?.id ?? null;
+    } catch { /* unauthenticated or expired token */ }
+  }
+
+  const comments = (result.rows as Record<string, unknown>[]).map(row => ({
+    ...row,
+    is_owner: currentUserId !== null && row.user_id === currentUserId,
+  }));
+
+  return c.json(comments);
 });
 
 // POST /api/videos/:id/comments — authenticated + active subscription required
