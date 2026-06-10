@@ -11,7 +11,7 @@ process.on("unhandledRejection", (reason, promise) => {
 
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { Webhook } from "svix";
 import { query, pool } from "./db.js";
 import { containsBlockedContent } from "./commentFilter.js";
@@ -495,8 +495,8 @@ app.get("/api/watch/:id", async (c) => {
 
 app.get("/api/public/cover-art", async (c) => {
   const result = await query(
-    `SELECT id, title, cover_image_url, thumbnail_url, content_type FROM videos
-     WHERE is_published = true AND cover_image_url IS NOT NULL
+    `SELECT id, title, thumbnail_url, content_type FROM videos
+     WHERE is_published = true AND thumbnail_url IS NOT NULL
      LIMIT 50`
   );
   return c.json(result.rows);
@@ -1305,16 +1305,13 @@ app.post("/api/auth/set-password", clerkAuth, async (c) => {
   }
 });
 
-// Email + password sign-in for TV devices that can't do OAuth redirects
-app.post("/api/auth/device/signin", async (c) => {
-  const body = await c.req.json<{ email?: string; password?: string }>();
-  const { email, password } = body;
-
+// Shared email + password sign-in logic for TV devices that can't do OAuth redirects
+async function deviceSignIn(email: string | undefined, password: string | undefined) {
   if (!email || !password) {
-    return c.json({ error: "Invalid email or password" }, 401);
+    return { error: "Invalid email or password" as const };
   }
 
-  // Look up user in our DB — same 401 for both "not found" and "wrong password"
+  // Look up user in our DB — same error for both "not found" and "wrong password"
   // to avoid leaking which emails are registered
   const userResult = await query<{
     id: number;
@@ -1329,7 +1326,7 @@ app.post("/api/auth/device/signin", async (c) => {
   );
 
   if (userResult.rows.length === 0) {
-    return c.json({ error: "Invalid email or password" }, 401);
+    return { error: "Invalid email or password" as const };
   }
 
   const dbUser = userResult.rows[0];
@@ -1337,7 +1334,7 @@ app.post("/api/auth/device/signin", async (c) => {
   try {
     await clerk.users.verifyPassword({ userId: dbUser.clerk_user_id, password });
   } catch {
-    return c.json({ error: "Invalid email or password" }, 401);
+    return { error: "Invalid email or password" as const };
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -1349,14 +1346,30 @@ app.post("/api/auth/device/signin", async (c) => {
     exp: now + 90 * 24 * 60 * 60,
   });
 
-  return c.json({
+  return {
     sessionToken,
     user: {
       id: dbUser.id,
+      name: dbUser.display_name,
       display_name: dbUser.display_name,
       email: dbUser.email,
     },
-  });
+  };
+}
+
+app.post("/api/auth/device/signin", async (c) => {
+  const body = await c.req.json<{ email?: string; password?: string }>();
+  const result = await deviceSignIn(body.email, body.password);
+  if ("error" in result) return c.json({ error: result.error }, 401);
+  return c.json(result);
+});
+
+// Roku contract: POST /api/auth/clerk-session — { email, password } -> { sessionToken }
+app.post("/api/auth/clerk-session", async (c) => {
+  const body = await c.req.json<{ email?: string; password?: string }>();
+  const result = await deviceSignIn(body.email, body.password);
+  if ("error" in result) return c.json({ error: result.error }, 401);
+  return c.json(result);
 });
 
 // ─── TV Device Activation ────────────────────────────────────────────────────
@@ -1381,9 +1394,7 @@ app.post("/api/auth/device/request-code", async (c) => {
 });
 
 // Called by TV app every 5 seconds while waiting for user to activate
-app.post("/api/auth/device/poll", async (c) => {
-  const body = await c.req.json<{ device_token?: string }>();
-  const deviceToken = body.device_token;
+async function handleDevicePoll(c: Context, deviceToken: string | undefined) {
   if (!deviceToken) return c.json({ error: "device_token required" }, 400);
 
   const allowed = await checkPollRateLimit(deviceToken);
@@ -1406,11 +1417,11 @@ app.post("/api/auth/device/poll", async (c) => {
   };
 
   if (record.status === "pending" && new Date(record.expires_at) < new Date()) {
-    return c.json({ status: "expired" });
+    return c.json({ status: "expired", codeExpired: true });
   }
 
   if (record.status === "pending") return c.json({ status: "pending" });
-  if (record.status === "expired") return c.json({ status: "expired" });
+  if (record.status === "expired") return c.json({ status: "expired", codeExpired: true });
 
   if (record.status === "activated" && record.user_id) {
     const now = Math.floor(Date.now() / 1000);
@@ -1429,10 +1440,20 @@ app.post("/api/auth/device/poll", async (c) => {
       exp: now + 90 * 24 * 60 * 60,
     });
 
-    return c.json({ status: "activated", session_token: sessionToken });
+    return c.json({ status: "activated", sessionToken, session_token: sessionToken });
   }
 
   return c.json({ status: record.status });
+}
+
+app.post("/api/auth/device/poll", async (c) => {
+  const body = await c.req.json<{ device_token?: string; deviceToken?: string }>();
+  return handleDevicePoll(c, body.device_token ?? body.deviceToken);
+});
+
+app.get("/api/auth/device/poll", async (c) => {
+  const deviceToken = c.req.query("device_token") ?? c.req.query("deviceToken");
+  return handleDevicePoll(c, deviceToken);
 });
 
 // Called by website when signed-in user enters the code shown on their TV
@@ -1526,6 +1547,7 @@ app.get("/api/auth/device/verify", async (c) => {
   return c.json({
     user: {
       id: u.id,
+      name: u.display_name,
       display_name: u.display_name,
       email: u.email,
     },
