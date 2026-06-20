@@ -1,0 +1,74 @@
+{
+  "expo": {
+    "name": "ReelMotion",
+    "slug": "reelmotion",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "reelmotion",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "tv.reelmotion.app",
+      "associatedDomains": [
+        "applinks:reelmotion-production.up.railway.app"
+      ]
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      },
+      "package": "tv.reelmotion.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "reelmotion-production.up.railway.app",
+              "pathPrefix": "/billing/success"
+            },
+            {
+              "scheme": "https",
+              "host": "reelmotion-production.up.railway.app",
+              "pathPrefix": "/subscribe"
+            },
+            {
+              "scheme": "https",
+              "host": "reelmotion-production.up.railway.app",
+              "pathPrefix": "/watch"
+            },
+            {
+              "scheme": "https",
+              "host": "reelmotion-production.up.railway.app",
+              "pathPrefix": "/series"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#000000",
+          "image": "./assets/splash.png",
+          "imageWidth": 200
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
