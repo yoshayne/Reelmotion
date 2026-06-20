@@ -98,13 +98,16 @@ export default function Browse() {
   const allVideos: Video[] = browseData?.videos || [];
   const allSeries: Series[] = browseData?.series || [];
 
-  const newVideos = allVideos.filter(v => {
+  const sortFreeFirst = (arr: Video[]) =>
+    [...arr].sort((a, b) => (b.is_free ? 1 : 0) - (a.is_free ? 1 : 0));
+
+  const newVideos = sortFreeFirst(allVideos.filter(v => {
     if (!v.created_at) return false;
     const d = new Date(v.created_at);
     return (Date.now() - d.getTime()) < 7 * 24 * 60 * 60 * 1000;
-  });
-  const movies = allVideos.filter(v => v.content_type === "movie");
-  const clips = allVideos.filter(v => v.content_type === "clip");
+  }));
+  const movies = sortFreeFirst(allVideos.filter(v => v.content_type === "movie"));
+  const clips = sortFreeFirst(allVideos.filter(v => v.content_type === "clip"));
 
   const tabs: { id: TabType; label: string }[] = [
     { id: "all", label: "ALL" },
@@ -350,7 +353,11 @@ export default function Browse() {
                   image={v.thumbnail_url}
                   title={v.title}
                   onClick={() => navigate(`/watch/${v.id}`)}
-                  badge={<span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest" style={{ backgroundColor: '#E8001D' }}>NEW</span>}
+                  badge={
+                    v.is_free
+                      ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span>
+                      : <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest" style={{ backgroundColor: '#E8001D' }}>NEW</span>
+                  }
                 />
               ))}
             </ScrollRow>
@@ -368,6 +375,7 @@ export default function Browse() {
                   image={v.thumbnail_url}
                   title={v.title}
                   onClick={() => navigate(`/watch/${v.id}`)}
+                  badge={v.is_free ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span> : undefined}
                 />
               ))}
             </ScrollRow>
@@ -387,6 +395,9 @@ export default function Browse() {
                         <img src={v.thumbnail_url} alt={v.title} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full bg-zinc-900" />
+                      )}
+                      {v.is_free && (
+                        <span className="absolute top-2 left-2 px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span>
                       )}
                     </div>
                     <p className="text-[12px] font-semibold mt-1.5 truncate" style={{ color: 'rgba(255,255,255,0.85)' }}>{v.title}</p>
