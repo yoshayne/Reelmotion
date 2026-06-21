@@ -547,6 +547,23 @@ app.get("/api/brand-assets/public", async (c) => {
   return c.json(assets);
 });
 
+// Redirect to the brand logo — used as og:image so social crawlers pick up the logo
+app.get("/api/og-image", async (c) => {
+  try {
+    const result = await query(
+      `SELECT file_key FROM brand_assets WHERE name ILIKE '%logo%' OR name ILIKE '%reelmotion%' ORDER BY created_at ASC LIMIT 1`
+    );
+    if (result.rows[0]) {
+      return c.redirect(`/api/images/${result.rows[0].file_key}`, 302);
+    }
+    // Fallback: first file in brand/ storage folder
+    const files = await listFiles("brand/");
+    const logo = files.find(f => f.name && /logo|reelmotion/i.test(f.name)) || files[0];
+    if (logo) return c.redirect(`/api/images/${logo.key}`, 302);
+  } catch {}
+  return c.notFound();
+});
+
 app.post("/api/contest", async (c) => {
   const body = await c.req.json<{
     film_title: string;
