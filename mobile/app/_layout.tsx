@@ -3,9 +3,6 @@ import { tokenCache } from "../lib/tokenCache";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
-import * as SplashScreen from "expo-splash-screen";
-
-SplashScreen.preventAutoHideAsync();
 
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -16,7 +13,6 @@ function AuthGate() {
 
   useEffect(() => {
     if (!isLoaded) return;
-    SplashScreen.hideAsync();
 
     const inAuthGroup = segments[0] === "(auth)";
 
@@ -25,7 +21,9 @@ function AuthGate() {
     } else if (isSignedIn && inAuthGroup) {
       router.replace("/(app)");
     }
-  }, [isSignedIn, isLoaded]);
+  }, [isSignedIn, isLoaded, segments]);
+
+  if (!isLoaded) return null;
 
   return <Slot />;
 }
