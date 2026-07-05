@@ -11,6 +11,7 @@
   "dependencies": {
     "@clerk/clerk-expo": "^2.x",
     "expo": "~52.0.0",
+    "expo-asset": "~11.0.4",
     "expo-auth-session": "~6.0.0",
     "expo-constants": "~17.0.0",
     "expo-linking": "~7.0.0",
@@ -21,10 +22,10 @@
     "expo-system-ui": "~4.0.0",
     "expo-web-browser": "~14.0.0",
     "react": "18.3.1",
-    "react-native": "0.76.5",
+    "react-native": "0.76.9",
     "react-native-safe-area-context": "4.12.0",
     "react-native-screens": "~4.4.0",
-    "react-native-webview": "13.12.2"
+    "react-native-webview": "13.12.5"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
