@@ -1,5 +1,5 @@
 import { ClerkProvider, useAuth } from "@clerk/clerk-expo";
-import { tokenCache } from "@/lib/tokenCache";
+import { tokenCache } from "../lib/tokenCache";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
