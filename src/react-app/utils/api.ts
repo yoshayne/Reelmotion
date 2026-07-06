@@ -5,11 +5,15 @@ declare global {
         getToken: () => Promise<string | null>;
       };
     };
+    __NATIVE_CLERK_TOKEN__?: string;
   }
 }
 
 async function getAuthToken(): Promise<string | null> {
   try {
+    // Native mobile app injects token via injectJavaScript before page loads
+    if (window.__NATIVE_CLERK_TOKEN__) return window.__NATIVE_CLERK_TOKEN__;
+
     let token = await window.Clerk?.session?.getToken() ?? null;
     if (!token) {
       // Clerk marks isSignedIn=true slightly before the session token is ready.
