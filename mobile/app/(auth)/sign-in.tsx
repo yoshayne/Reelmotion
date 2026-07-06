@@ -32,6 +32,8 @@ export default function SignInScreen() {
   }, []);
 
   const signInWithGoogle = async () => {
+    // Immediate test — if this Alert doesn't appear, the button isn't receiving taps
+    Alert.alert("Button tapped", `startSSOFlow: ${typeof startSSOFlow}`);
     setLoading(true);
     setError(null);
     try {
