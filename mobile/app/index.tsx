@@ -22,13 +22,11 @@ export default function App() {
   const webViewRef = useRef<WebView>(null);
 
   const openOAuth = async (url: string) => {
-    const result = await WebBrowser.openAuthSessionAsync(url, APP_URL);
-    if (result.type === "success" && result.url) {
-      // Hand the callback URL back to the WebView so Clerk can finalize the session
-      webViewRef.current?.injectJavaScript(
-        `window.location.href = ${JSON.stringify(result.url)}; true;`
-      );
-    }
+    // Opens in ASWebAuthenticationSession (iOS) / Chrome Custom Tab (Android)
+    // which shares the same cookie store as WKWebView with sharedCookiesEnabled.
+    // After auth completes, reload the WebView to pick up the Clerk session cookie.
+    await WebBrowser.openAuthSessionAsync(url, APP_URL);
+    webViewRef.current?.reload();
   };
 
   const handleShouldStartLoad = (request: { url: string }) => {
@@ -59,6 +57,7 @@ export default function App() {
         mediaPlaybackRequiresUserAction={false}
         allowsFullscreenVideo
         setSupportMultipleWindows={false}
+        sharedCookiesEnabled={true}
         onShouldStartLoadWithRequest={handleShouldStartLoad}
         onOpenWindow={handleOpenWindow}
         startInLoadingState
