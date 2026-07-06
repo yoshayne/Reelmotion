@@ -9,33 +9,42 @@ const CHROME_UA =
     ? "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
     : "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/124.0.0.0 Mobile/15E148 Safari/604.1";
 
-// URLs that should open in Safari instead of the WebView
+// URLs that must open in the system browser (Safari/Chrome) not the WebView
 const EXTERNAL_PATTERNS = [
   "accounts.google.com",
   "clerk.reelmotionapp.com",
   "accounts.clerk.com",
 ];
 
+const isExternal = (url: string) =>
+  EXTERNAL_PATTERNS.some((p) => url.includes(p));
+
 export default function App() {
   const webViewRef = useRef<WebView>(null);
 
-  const shouldOpenInSafari = (url: string) =>
-    EXTERNAL_PATTERNS.some((p) => url.includes(p));
+  // iOS: intercept top-level navigations before they load
+  const handleShouldStartLoad = (request: { url: string }) => {
+    if (isExternal(request.url)) {
+      Linking.openURL(request.url);
+      return false;
+    }
+    return true;
+  };
 
+  // Both: catch navigations that already started
   const handleNavigationChange = (nav: WebViewNavigation) => {
-    if (shouldOpenInSafari(nav.url)) {
-      // Stop WebView loading this URL and open in Safari instead
+    if (isExternal(nav.url)) {
       webViewRef.current?.stopLoading();
       Linking.openURL(nav.url);
     }
   };
 
-  const handleShouldStartLoad = (request: { url: string }) => {
-    if (shouldOpenInSafari(request.url)) {
-      Linking.openURL(request.url);
-      return false; // block the WebView from loading it
+  // Android: catch popup/new-window requests (Google OAuth opens this way)
+  const handleOpenWindow = (syntheticEvent: any) => {
+    const { targetUrl } = syntheticEvent.nativeEvent;
+    if (targetUrl) {
+      Linking.openURL(targetUrl);
     }
-    return true;
   };
 
   return (
@@ -51,8 +60,9 @@ export default function App() {
         mediaPlaybackRequiresUserAction={false}
         allowsFullscreenVideo
         setSupportMultipleWindows={true}
-        onNavigationStateChange={handleNavigationChange}
         onShouldStartLoadWithRequest={handleShouldStartLoad}
+        onNavigationStateChange={handleNavigationChange}
+        onOpenWindow={handleOpenWindow}
         startInLoadingState
         renderLoading={() => (
           <View style={styles.loader}>
