@@ -32,8 +32,6 @@ export default function SignInScreen() {
   }, []);
 
   const signInWithGoogle = async () => {
-    // Immediate test — if this Alert doesn't appear, the button isn't receiving taps
-    Alert.alert("Button tapped", `startSSOFlow: ${typeof startSSOFlow}`);
     setLoading(true);
     setError(null);
     try {
@@ -41,7 +39,7 @@ export default function SignInScreen() {
         throw new Error("useSSO hook not available — check @clerk/clerk-expo version");
       }
 
-      const redirectUrl = Linking.createURL("/");
+      const redirectUrl = Linking.createURL("");
       console.log("SSO redirect URL:", redirectUrl);
 
       const result = await startSSOFlow({
