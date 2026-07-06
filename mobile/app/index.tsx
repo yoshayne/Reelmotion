@@ -1,43 +1,48 @@
-import { useAuth } from "@clerk/clerk-expo";
-import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native";
+import * as WebBrowser from "expo-web-browser";
+import { useRef } from "react";
+import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
 
-const APP_URL = "https://reelmotion-production.up.railway.app";
+const APP_URL = "https://reelmotionapp.com";
 
 const CHROME_UA =
   Platform.OS === "android"
     ? "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
     : "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/124.0.0.0 Mobile/15E148 Safari/604.1";
 
-export default function AppScreen() {
-  const { getToken, signOut } = useAuth();
-  const webViewRef = useRef<WebView>(null);
-  const [tokenInjected, setTokenInjected] = useState(false);
+const OAUTH_PATTERNS = [
+  "accounts.google.com",
+  "clerk.reelmotionapp.com",
+  "accounts.clerk.com",
+];
 
-  const injectToken = async () => {
-    if (tokenInjected) return;
-    try {
-      const token = await getToken();
-      if (token && webViewRef.current) {
-        webViewRef.current.injectJavaScript(`
-          (function() {
-            window.__NATIVE_CLERK_TOKEN__ = ${JSON.stringify(token)};
-            window.dispatchEvent(new Event('native-token-ready'));
-          })();
-          true;
-        `);
-        setTokenInjected(true);
-      }
-    } catch (err) {
-      console.error("Token injection failed:", err);
+const isOAuth = (url: string) => OAUTH_PATTERNS.some((p) => url.includes(p));
+
+export default function App() {
+  const webViewRef = useRef<WebView>(null);
+
+  const openOAuth = async (url: string) => {
+    const result = await WebBrowser.openAuthSessionAsync(url, APP_URL);
+    if (result.type === "success" && result.url) {
+      // Hand the callback URL back to the WebView so Clerk can finalize the session
+      webViewRef.current?.injectJavaScript(
+        `window.location.href = ${JSON.stringify(result.url)}; true;`
+      );
+    }
+  };
+
+  const handleShouldStartLoad = (request: { url: string }) => {
+    if (isOAuth(request.url)) {
+      openOAuth(request.url);
+      return false;
+    }
+    return true;
+  };
+
+  const handleOpenWindow = (syntheticEvent: any) => {
+    const { targetUrl } = syntheticEvent.nativeEvent;
+    if (targetUrl) {
+      openOAuth(targetUrl);
     }
   };
 
@@ -53,7 +58,9 @@ export default function AppScreen() {
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         allowsFullscreenVideo
-        onLoadEnd={injectToken}
+        setSupportMultipleWindows={false}
+        onShouldStartLoadWithRequest={handleShouldStartLoad}
+        onOpenWindow={handleOpenWindow}
         startInLoadingState
         renderLoading={() => (
           <View style={styles.loader}>
