@@ -14,8 +14,12 @@ const CHROME_UA =
     ? "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
     : "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/124.0.0.0 Mobile/15E148 Safari/604.1";
 
-const OAUTH_PATTERNS = ["accounts.google.com", "clerk.reelmotionapp.com", "accounts.clerk.com"];
-const isOAuth = (url: string) => OAUTH_PATTERNS.some((p) => url.includes(p));
+// Injected before the page loads — tells the website it's running in the native app
+// so Landing.tsx skips Clerk's web OAuth and messages us instead
+const INJECTED_JS = `
+  window.__NATIVE_APP__ = true;
+  true;
+`;
 
 const ts = () => new Date().toISOString().slice(11, 23);
 
@@ -146,46 +150,19 @@ export default function App() {
     }
   };
 
-  const clearClerkWebState = () => {
-    addLog("Clearing Clerk web OAuth state from WebView storage");
-    webViewRef.current?.injectJavaScript(`
-      (function() {
-        try {
-          var lsKeys = Object.keys(localStorage).filter(function(k){ return k.includes('clerk')||k.includes('oauth')||k.includes('pkce'); });
-          lsKeys.forEach(function(k){ localStorage.removeItem(k); });
-          var ssKeys = Object.keys(sessionStorage).filter(function(k){ return k.includes('clerk')||k.includes('oauth')||k.includes('pkce'); });
-          ssKeys.forEach(function(k){ sessionStorage.removeItem(k); });
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'STORAGE_CLEARED', ls: lsKeys, ss: ssKeys }));
-        } catch(e) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'STORAGE_CLEAR_ERROR', err: String(e) }));
-        }
-      })();
-      true;
-    `);
-  };
-
-  const handleShouldStartLoad = (request: { url: string }) => {
-    if (isOAuth(request.url)) {
-      addLog(`OAUTH INTERCEPTED: ${request.url}`);
-      clearClerkWebState();
-      handleNativeSSO();
-      return false;
-    }
-    return true;
-  };
-
   const handleOpenWindow = (syntheticEvent: any) => {
     const { targetUrl } = syntheticEvent.nativeEvent;
-    if (targetUrl && isOAuth(targetUrl)) {
-      addLog(`OpenWindow OAuth: ${targetUrl}`);
-      handleNativeSSO();
-    }
+    addLog(`OpenWindow: ${targetUrl}`);
   };
 
   const handleWebViewMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       addLog(`WebView→Native: ${JSON.stringify(data)}`);
+      if (data.type === "GOOGLE_SIGN_IN") {
+        addLog("Website requested native Google sign-in");
+        handleNativeSSO();
+      }
     } catch {
       addLog(`WebView→Native (raw): ${event.nativeEvent.data}`);
     }
@@ -212,7 +189,7 @@ export default function App() {
         mediaPlaybackRequiresUserAction={false}
         allowsFullscreenVideo
         setSupportMultipleWindows={false}
-        onShouldStartLoadWithRequest={handleShouldStartLoad}
+        injectedJavaScript={INJECTED_JS}
         onOpenWindow={handleOpenWindow}
         onMessage={handleWebViewMessage}
         onLoadEnd={() => {

@@ -14,12 +14,27 @@ export default function Landing() {
   }, [isSignedIn, navigate]);
 
   const handleGoogleSignIn = () => {
+    // When running inside the native app, message the native layer to handle
+    // Google sign-in via SFSafariViewController (Clerk web OAuth is blocked in WKWebView)
+    if ((window as any).__NATIVE_APP__) {
+      (window as any).ReactNativeWebView?.postMessage(
+        JSON.stringify({ type: "GOOGLE_SIGN_IN" })
+      );
+      // Navigation will happen when the native app fires 'native-session-ready'
+      return;
+    }
     signIn?.authenticateWithRedirect({
       strategy: "oauth_google",
       redirectUrl: "/sso-callback",
       redirectUrlComplete: "/browse",
     });
   };
+
+  useEffect(() => {
+    const onNativeSession = () => navigate("/browse", { replace: true });
+    window.addEventListener("native-session-ready", onNativeSession);
+    return () => window.removeEventListener("native-session-ready", onNativeSession);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-black to-zinc-950 text-white overflow-hidden relative flex items-center justify-center">
