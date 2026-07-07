@@ -4,10 +4,18 @@ import { Search, User } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { apiFetch } from "@/react-app/utils/api";
 import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
+import { useNativeSession } from "@/react-app/hooks/useNativeSession";
 
 export default function Navbar() {
-  const { user, isSignedIn } = useUser();
+  const { user: clerkUser, isSignedIn: clerkSignedIn } = useUser();
   const { signOut } = useClerk();
+  const { isNativeApp, nativeUser, isSignedIn: nativeSignedIn } = useNativeSession();
+
+  const isSignedIn = clerkSignedIn || nativeSignedIn;
+  const user = clerkUser ?? (nativeUser ? {
+    imageUrl: nativeUser.imageUrl,
+    primaryEmailAddress: { emailAddress: nativeUser.email },
+  } : null);
   const navigate = useNavigate();
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [userRole, setUserRole] = useState("");
@@ -36,7 +44,10 @@ export default function Navbar() {
   }, [user]);
 
   const handleLogout = async () => {
-    await signOut();
+    if (!isNativeApp) await signOut();
+    window.__NATIVE_APP__ = undefined;
+    window.__NATIVE_CLERK_TOKEN__ = undefined;
+    window.__NATIVE_USER__ = undefined;
     window.location.href = "/";
   };
 

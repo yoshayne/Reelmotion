@@ -1,5 +1,5 @@
-import * as WebBrowser from "expo-web-browser";
-import { useRef } from "react";
+import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useRef, useState } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
 
@@ -10,37 +10,38 @@ const CHROME_UA =
     ? "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
     : "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/124.0.0.0 Mobile/15E148 Safari/604.1";
 
-const OAUTH_PATTERNS = [
-  "accounts.google.com",
-  "clerk.reelmotionapp.com",
-  "accounts.clerk.com",
-];
-
-const isOAuth = (url: string) => OAUTH_PATTERNS.some((p) => url.includes(p));
-
-export default function App() {
+export default function AppScreen() {
+  const { getToken } = useAuth();
+  const { user } = useUser();
   const webViewRef = useRef<WebView>(null);
+  const [injected, setInjected] = useState(false);
 
-  const openOAuth = async (url: string) => {
-    // Opens in ASWebAuthenticationSession (iOS) / Chrome Custom Tab (Android)
-    // which shares the same cookie store as WKWebView with sharedCookiesEnabled.
-    // After auth completes, reload the WebView to pick up the Clerk session cookie.
-    await WebBrowser.openAuthSessionAsync(url, APP_URL);
-    webViewRef.current?.reload();
-  };
+  const injectSession = async () => {
+    if (injected) return;
+    try {
+      const token = await getToken();
+      if (!token || !webViewRef.current) return;
 
-  const handleShouldStartLoad = (request: { url: string }) => {
-    if (isOAuth(request.url)) {
-      openOAuth(request.url);
-      return false;
-    }
-    return true;
-  };
+      const userInfo = {
+        id: user?.id ?? "",
+        email: user?.primaryEmailAddress?.emailAddress ?? "",
+        firstName: user?.firstName ?? "",
+        lastName: user?.lastName ?? "",
+        imageUrl: user?.imageUrl ?? "",
+      };
 
-  const handleOpenWindow = (syntheticEvent: any) => {
-    const { targetUrl } = syntheticEvent.nativeEvent;
-    if (targetUrl) {
-      openOAuth(targetUrl);
+      webViewRef.current.injectJavaScript(`
+        (function() {
+          window.__NATIVE_APP__ = true;
+          window.__NATIVE_CLERK_TOKEN__ = ${JSON.stringify(token)};
+          window.__NATIVE_USER__ = ${JSON.stringify(userInfo)};
+          window.dispatchEvent(new CustomEvent('native-session-ready', { detail: { user: window.__NATIVE_USER__ } }));
+        })();
+        true;
+      `);
+      setInjected(true);
+    } catch (e) {
+      console.error("Session injection failed:", e);
     }
   };
 
@@ -53,13 +54,12 @@ export default function App() {
         userAgent={CHROME_UA}
         javaScriptEnabled
         domStorageEnabled
+        sharedCookiesEnabled
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         allowsFullscreenVideo
         setSupportMultipleWindows={false}
-        sharedCookiesEnabled={true}
-        onShouldStartLoadWithRequest={handleShouldStartLoad}
-        onOpenWindow={handleOpenWindow}
+        onLoadEnd={injectSession}
         startInLoadingState
         renderLoading={() => (
           <View style={styles.loader}>
@@ -76,10 +76,7 @@ const styles = StyleSheet.create({
   webview: { flex: 1, backgroundColor: "#000" },
   loader: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#000",
