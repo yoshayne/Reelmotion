@@ -127,10 +127,34 @@ export default function App() {
     }
   };
 
+  const clearClerkWebState = () => {
+    // Clear Clerk's PKCE/OAuth state from the WebView's localStorage so the
+    // web Clerk SDK doesn't detect an abandoned flow and call signOut()
+    webViewRef.current?.injectJavaScript(`
+      (function() {
+        try {
+          Object.keys(localStorage).forEach(function(key) {
+            if (key.includes('clerk') || key.includes('oauth') || key.includes('pkce') || key.includes('__clerk')) {
+              localStorage.removeItem(key);
+            }
+          });
+          Object.keys(sessionStorage).forEach(function(key) {
+            if (key.includes('clerk') || key.includes('oauth') || key.includes('pkce')) {
+              sessionStorage.removeItem(key);
+            }
+          });
+          console.log('[Native] Cleared Clerk web OAuth state');
+        } catch(e) {}
+      })();
+      true;
+    `);
+  };
+
   const handleShouldStartLoad = (request: { url: string }) => {
     log(`Navigation: ${request.url}`);
     if (isOAuth(request.url)) {
       log(`OAuth intercepted: ${request.url}`);
+      clearClerkWebState();
       handleNativeSSO();
       return false;
     }
