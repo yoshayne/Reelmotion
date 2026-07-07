@@ -1,8 +1,8 @@
 import { useSSO, useAuth, useUser } from "@clerk/clerk-expo";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
-import { useEffect, useRef } from "react";
-import { ActivityIndicator, Alert, Platform, StyleSheet, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Platform, StyleSheet, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -21,21 +21,46 @@ const OAUTH_PATTERNS = [
 ];
 const isOAuth = (url: string) => OAUTH_PATTERNS.some((p) => url.includes(p));
 
+const log = (msg: string) => {
+  console.log(`[ReelMotion] ${msg}`);
+};
+
 export default function App() {
   const { startSSOFlow } = useSSO();
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const webViewRef = useRef<WebView>(null);
+  const [statusMsg, setStatusMsg] = useState("Loading...");
+  const injectedRef = useRef(false);
 
-  // Inject session whenever the user becomes signed in
+  log(`Render: isLoaded=${isLoaded} isSignedIn=${isSignedIn} user=${user?.id ?? "none"}`);
+
   useEffect(() => {
-    if (isSignedIn) injectSession();
+    log(`Auth state changed: isSignedIn=${isSignedIn}`);
+    if (isSignedIn && !injectedRef.current) {
+      injectSession("auth-state-change");
+    }
   }, [isSignedIn]);
 
-  const injectSession = async () => {
+  const injectSession = async (trigger: string) => {
     try {
+      log(`injectSession called from: ${trigger}`);
+      setStatusMsg(`Injecting session (${trigger})...`);
+
       const token = await getToken();
-      if (!token || !webViewRef.current) return;
+      log(`Token obtained: ${token ? "YES (" + token.slice(0, 20) + "...)" : "NO"}`);
+
+      if (!token) {
+        log("No token available — skipping injection");
+        setStatusMsg("No token");
+        return;
+      }
+      if (!webViewRef.current) {
+        log("WebView ref not ready — skipping injection");
+        setStatusMsg("WebView not ready");
+        return;
+      }
+
       const userInfo = {
         id: user?.id ?? "",
         email: user?.primaryEmailAddress?.emailAddress ?? "",
@@ -43,54 +68,93 @@ export default function App() {
         lastName: user?.lastName ?? "",
         imageUrl: user?.imageUrl ?? "",
       };
+
+      log(`Injecting user: ${JSON.stringify(userInfo)}`);
+
       webViewRef.current.injectJavaScript(`
         (function() {
+          console.log('[Native] Injecting session...');
           window.__NATIVE_APP__ = true;
           window.__NATIVE_CLERK_TOKEN__ = ${JSON.stringify(token)};
           window.__NATIVE_USER__ = ${JSON.stringify(userInfo)};
           window.dispatchEvent(new CustomEvent('native-session-ready', { detail: { user: window.__NATIVE_USER__ } }));
+          console.log('[Native] Session injected for: ' + window.__NATIVE_USER__.email);
         })();
         true;
       `);
-    } catch (e) {
-      console.error("Session injection error:", e);
+
+      injectedRef.current = true;
+      setStatusMsg(`Signed in: ${userInfo.email}`);
+      log(`Session injected for ${userInfo.email}`);
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      log(`injectSession ERROR: ${msg}`);
+      setStatusMsg(`Injection error: ${msg}`);
+      Alert.alert("Session Error", msg);
     }
   };
 
   const handleNativeSSO = async () => {
+    log("handleNativeSSO called");
+    setStatusMsg("Starting Google sign-in...");
     try {
-      const { createdSessionId, setActive } = await startSSOFlow({
+      const redirectUrl = Linking.createURL("");
+      log(`SSO redirectUrl: ${redirectUrl}`);
+
+      const result = await startSSOFlow({
         strategy: "oauth_google",
-        redirectUrl: Linking.createURL(""),
+        redirectUrl,
       });
+
+      log(`SSO result: createdSessionId=${result.createdSessionId ?? "none"}`);
+
+      const { createdSessionId, setActive } = result;
       if (createdSessionId && setActive) {
+        log("Setting active session...");
         await setActive({ session: createdSessionId });
-        await injectSession();
+        log("Session set active — injecting into WebView");
+        injectedRef.current = false; // allow re-injection
+        await injectSession("post-sso");
+      } else {
+        log("No createdSessionId returned from startSSOFlow");
+        Alert.alert("Sign-in incomplete", "No session was created. Please try again.");
       }
     } catch (err: any) {
-      Alert.alert("Sign-in Error", err?.message ?? String(err));
+      const msg = err?.message ?? String(err);
+      log(`handleNativeSSO ERROR: ${msg}`);
+      Alert.alert("Sign-in Error", msg);
+      setStatusMsg(`Error: ${msg}`);
     }
   };
 
-  // Intercept OAuth navigations from the website and handle natively
   const handleShouldStartLoad = (request: { url: string }) => {
+    log(`Navigation: ${request.url}`);
     if (isOAuth(request.url)) {
+      log(`OAuth intercepted: ${request.url}`);
       handleNativeSSO();
-      return false; // block WebView from navigating, handle natively instead
+      return false;
     }
     return true;
   };
 
-  // Android: catch popup/new-window OAuth requests
   const handleOpenWindow = (syntheticEvent: any) => {
     const { targetUrl } = syntheticEvent.nativeEvent;
+    log(`OpenWindow: ${targetUrl}`);
     if (targetUrl && isOAuth(targetUrl)) {
       handleNativeSSO();
     }
   };
 
+  const handleWebViewMessage = (event: any) => {
+    log(`WebView message: ${event.nativeEvent.data}`);
+  };
+
   return (
     <View style={styles.container}>
+      {/* Slim debug bar — remove after testing */}
+      <View style={styles.debugBar}>
+        <Text style={styles.debugText} numberOfLines={1}>{statusMsg}</Text>
+      </View>
       <WebView
         ref={webViewRef}
         source={{ uri: APP_URL }}
@@ -105,7 +169,11 @@ export default function App() {
         setSupportMultipleWindows={false}
         onShouldStartLoadWithRequest={handleShouldStartLoad}
         onOpenWindow={handleOpenWindow}
-        onLoadEnd={injectSession}
+        onMessage={handleWebViewMessage}
+        onLoadEnd={() => {
+          log("WebView onLoadEnd");
+          if (isSignedIn) injectSession("load-end");
+        }}
         startInLoadingState
         renderLoading={() => (
           <View style={styles.loader}>
@@ -120,6 +188,13 @@ export default function App() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
   webview: { flex: 1, backgroundColor: "#000" },
+  debugBar: {
+    backgroundColor: "#1a1a1a",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    paddingTop: 50,
+  },
+  debugText: { color: "#888", fontSize: 10, fontFamily: "monospace" },
   loader: {
     position: "absolute",
     top: 0, left: 0, right: 0, bottom: 0,
