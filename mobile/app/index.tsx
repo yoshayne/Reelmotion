@@ -1,7 +1,11 @@
-import { useAuth, useUser } from "@clerk/clerk-expo";
-import { useRef, useState } from "react";
-import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
+import { useSSO, useAuth, useUser } from "@clerk/clerk-expo";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
+import { useEffect, useRef } from "react";
+import { ActivityIndicator, Alert, Platform, StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
+
+WebBrowser.maybeCompleteAuthSession();
 
 const APP_URL = "https://reelmotionapp.com";
 
@@ -10,18 +14,28 @@ const CHROME_UA =
     ? "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
     : "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/124.0.0.0 Mobile/15E148 Safari/604.1";
 
-export default function AppScreen() {
-  const { getToken } = useAuth();
+const OAUTH_PATTERNS = [
+  "accounts.google.com",
+  "clerk.reelmotionapp.com",
+  "accounts.clerk.com",
+];
+const isOAuth = (url: string) => OAUTH_PATTERNS.some((p) => url.includes(p));
+
+export default function App() {
+  const { startSSOFlow } = useSSO();
+  const { getToken, isSignedIn } = useAuth();
   const { user } = useUser();
   const webViewRef = useRef<WebView>(null);
-  const [injected, setInjected] = useState(false);
+
+  // Inject session whenever the user becomes signed in
+  useEffect(() => {
+    if (isSignedIn) injectSession();
+  }, [isSignedIn]);
 
   const injectSession = async () => {
-    if (injected) return;
     try {
       const token = await getToken();
       if (!token || !webViewRef.current) return;
-
       const userInfo = {
         id: user?.id ?? "",
         email: user?.primaryEmailAddress?.emailAddress ?? "",
@@ -29,7 +43,6 @@ export default function AppScreen() {
         lastName: user?.lastName ?? "",
         imageUrl: user?.imageUrl ?? "",
       };
-
       webViewRef.current.injectJavaScript(`
         (function() {
           window.__NATIVE_APP__ = true;
@@ -39,9 +52,40 @@ export default function AppScreen() {
         })();
         true;
       `);
-      setInjected(true);
     } catch (e) {
-      console.error("Session injection failed:", e);
+      console.error("Session injection error:", e);
+    }
+  };
+
+  const handleNativeSSO = async () => {
+    try {
+      const { createdSessionId, setActive } = await startSSOFlow({
+        strategy: "oauth_google",
+        redirectUrl: Linking.createURL(""),
+      });
+      if (createdSessionId && setActive) {
+        await setActive({ session: createdSessionId });
+        await injectSession();
+      }
+    } catch (err: any) {
+      Alert.alert("Sign-in Error", err?.message ?? String(err));
+    }
+  };
+
+  // Intercept OAuth navigations from the website and handle natively
+  const handleShouldStartLoad = (request: { url: string }) => {
+    if (isOAuth(request.url)) {
+      handleNativeSSO();
+      return false; // block WebView from navigating, handle natively instead
+    }
+    return true;
+  };
+
+  // Android: catch popup/new-window OAuth requests
+  const handleOpenWindow = (syntheticEvent: any) => {
+    const { targetUrl } = syntheticEvent.nativeEvent;
+    if (targetUrl && isOAuth(targetUrl)) {
+      handleNativeSSO();
     }
   };
 
@@ -59,6 +103,8 @@ export default function AppScreen() {
         mediaPlaybackRequiresUserAction={false}
         allowsFullscreenVideo
         setSupportMultipleWindows={false}
+        onShouldStartLoadWithRequest={handleShouldStartLoad}
+        onOpenWindow={handleOpenWindow}
         onLoadEnd={injectSession}
         startInLoadingState
         renderLoading={() => (
