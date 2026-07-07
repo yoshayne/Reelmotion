@@ -207,7 +207,7 @@ export default function App() {
         userAgent={CHROME_UA}
         javaScriptEnabled
         domStorageEnabled
-        sharedCookiesEnabled
+        sharedCookiesEnabled={false}
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         allowsFullscreenVideo
