@@ -9,6 +9,7 @@
     "@aws-sdk/s3-request-presigner": "^3.x",
     "@clerk/backend": "^1.x",
     "@clerk/clerk-react": "^5.x",
+    "@getbrevo/brevo": "^6.0.2",
     "@hono/node-server": "^1.x",
     "@mux/mux-player-react": "^3.x",
     "hls.js": "^1.x",

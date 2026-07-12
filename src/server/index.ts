@@ -16,6 +16,7 @@ import { Webhook } from "svix";
 import { query, pool } from "./db.js";
 import { containsBlockedContent } from "./commentFilter.js";
 import { clerkAuth, adminAuth, clerk } from "./auth.js";
+import * as email from "./email.js";
 import Stripe from "stripe";
 import { stripe, createCheckoutSession, createPortalSession } from "./stripe.js";
 import { uploadFile, getPublicUrl, getSignedDownloadUrl, listFiles } from "./storage.js";
@@ -177,18 +178,17 @@ app.post("/api/webhooks/clerk", async (c) => {
     const role = ADMIN_EMAILS.includes(primaryEmail ?? "") ? "admin" : "viewer";
 
     if (type === "user.created") {
+      const displayName = [data.first_name, data.last_name].filter(Boolean).join(" ") || null;
       await query(
         `INSERT INTO users (clerk_user_id, email, role, display_name, avatar_url)
          VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (clerk_user_id) DO UPDATE SET role = $3`,
-        [
-          data.id,
-          primaryEmail,
-          role,
-          [data.first_name, data.last_name].filter(Boolean).join(" ") || null,
-          data.image_url,
-        ]
+        [data.id, primaryEmail, role, displayName, data.image_url]
       );
+      if (primaryEmail) {
+        email.sendWelcomeEmail(primaryEmail, data.first_name ?? "").catch(() => {});
+        email.notifyAdminNewUser(primaryEmail, displayName).catch(() => {});
+      }
     } else if (type === "user.updated") {
       await query(
         `UPDATE users SET email = $2, role = CASE WHEN email = ANY($5::text[]) THEN 'admin' ELSE role END,
@@ -270,6 +270,20 @@ app.post("/api/billing/stripe-webhook", async (c) => {
         );
 
         await invalidateCache(`subscription:${userId}`);
+
+        // Send subscription confirmation + admin alert
+        const userRow = await query<{ email: string; display_name: string | null }>(
+          "SELECT email, display_name FROM users WHERE id = $1",
+          [userId]
+        );
+        if (userRow.rows[0]) {
+          const { email: userEmail, display_name } = userRow.rows[0];
+          const firstName = display_name?.split(" ")[0] ?? "";
+          const amount = plan === "yearly" ? "$24.99/year" : "$4.99/month";
+          const renewDate = periodEnd.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+          email.sendSubscriptionConfirmationEmail(userEmail, firstName, plan, amount, renewDate).catch(() => {});
+          email.notifyAdminNewSubscription(userEmail, plan, amount).catch(() => {});
+        }
         break;
       }
 
@@ -308,14 +322,27 @@ app.post("/api/billing/stripe-webhook", async (c) => {
       }
 
       case "customer.subscription.deleted": {
-        const sub = event.data.object as { id: string };
-        const result = await query(
-          `UPDATE subscriptions SET status = 'canceled', period_end_date = NULL, updated_at = NOW()
-           WHERE stripe_subscription_id = $1 RETURNING user_id`,
+        const sub = event.data.object as unknown as Stripe.Subscription & { current_period_end: number };
+        const result = await query<{ user_id: number; period_end_date: string }>(
+          `UPDATE subscriptions SET status = 'canceled', updated_at = NOW()
+           WHERE stripe_subscription_id = $1 RETURNING user_id, period_end_date`,
           [sub.id]
         );
         if (result.rows[0]) {
           await invalidateCache(`subscription:${result.rows[0].user_id}`);
+          const userRow = await query<{ email: string; display_name: string | null }>(
+            "SELECT email, display_name FROM users WHERE id = $1",
+            [result.rows[0].user_id]
+          );
+          if (userRow.rows[0]) {
+            const { email: userEmail, display_name } = userRow.rows[0];
+            const firstName = display_name?.split(" ")[0] ?? "";
+            const accessUntil = result.rows[0].period_end_date
+              ? new Date(result.rows[0].period_end_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+              : "the end of your billing period";
+            email.sendCancellationEmail(userEmail, firstName, accessUntil).catch(() => {});
+            email.notifyAdminCancellation(userEmail).catch(() => {});
+          }
         }
         break;
       }
@@ -324,13 +351,60 @@ app.post("/api/billing/stripe-webhook", async (c) => {
         const invoice = event.data.object as unknown as { subscription?: string | null; parent?: { subscription_details?: { subscription?: string | null } } };
         const subId = invoice.subscription ?? invoice.parent?.subscription_details?.subscription ?? null;
         if (!subId) break;
-        const result = await query(
+        const result = await query<{ user_id: number }>(
           `UPDATE subscriptions SET status = 'past_due', updated_at = NOW()
            WHERE stripe_subscription_id = $1 RETURNING user_id`,
           [subId]
         );
         if (result.rows[0]) {
           await invalidateCache(`subscription:${result.rows[0].user_id}`);
+          const userRow = await query<{ email: string; display_name: string | null }>(
+            "SELECT email, display_name FROM users WHERE id = $1",
+            [result.rows[0].user_id]
+          );
+          if (userRow.rows[0]) {
+            const { email: userEmail, display_name } = userRow.rows[0];
+            const firstName = display_name?.split(" ")[0] ?? "";
+            email.sendPaymentFailedEmail(userEmail, firstName).catch(() => {});
+            email.notifyAdminPaymentFailed(userEmail).catch(() => {});
+          }
+        }
+        break;
+      }
+
+      case "invoice.payment_succeeded": {
+        const invoice = event.data.object as unknown as {
+          subscription?: string | null;
+          amount_paid?: number;
+          currency?: string;
+          billing_reason?: string;
+          parent?: { subscription_details?: { subscription?: string | null } };
+        };
+        // Only send receipt on renewals (not the initial checkout — that gets the confirmation email)
+        if (invoice.billing_reason === "subscription_create") break;
+        const subId = invoice.subscription ?? invoice.parent?.subscription_details?.subscription ?? null;
+        if (!subId) break;
+        const subRow = await query<{ user_id: number; plan: string; period_end_date: string }>(
+          "SELECT user_id, plan, period_end_date FROM subscriptions WHERE stripe_subscription_id = $1",
+          [subId]
+        );
+        if (subRow.rows[0]) {
+          const userRow = await query<{ email: string; display_name: string | null }>(
+            "SELECT email, display_name FROM users WHERE id = $1",
+            [subRow.rows[0].user_id]
+          );
+          if (userRow.rows[0]) {
+            const { email: userEmail, display_name } = userRow.rows[0];
+            const firstName = display_name?.split(" ")[0] ?? "";
+            const plan = subRow.rows[0].plan as "monthly" | "yearly";
+            const amountNum = (invoice.amount_paid ?? 0) / 100;
+            const currency = (invoice.currency ?? "usd").toUpperCase();
+            const amount = `$${amountNum.toFixed(2)} ${currency}`;
+            const nextDate = subRow.rows[0].period_end_date
+              ? new Date(subRow.rows[0].period_end_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+              : "—";
+            email.sendPaymentReceiptEmail(userEmail, firstName, plan, amount, nextDate).catch(() => {});
+          }
         }
         break;
       }
@@ -590,6 +664,8 @@ app.post("/api/contest", async (c) => {
       body.email,
     ]
   );
+
+  email.notifyAdminContestEntry(body.email, body.director_name).catch(() => {});
 
   return c.json({ success: true });
 });
@@ -1616,6 +1692,71 @@ try {
   });
 } catch (err) {
   console.error("Failed to register cron job:", err);
+}
+
+// Daily email jobs — run at 10am UTC
+try {
+  cron.schedule("0 10 * * *", async () => {
+    try {
+      // 7-day renewal reminder for yearly subscribers
+      const renewals = await pool.query<{ email: string; display_name: string | null; plan: string; period_end_date: string }>(
+        `SELECT u.email, u.display_name, s.plan, s.period_end_date
+         FROM subscriptions s JOIN users u ON u.id = s.user_id
+         WHERE s.status = 'active'
+           AND s.period_end_date::date = (CURRENT_DATE + INTERVAL '7 days')::date`
+      );
+      for (const row of renewals.rows) {
+        const firstName = row.display_name?.split(" ")[0] ?? "";
+        const plan = row.plan as "monthly" | "yearly";
+        const amount = plan === "yearly" ? "$24.99/year" : "$4.99/month";
+        const renewalDate = new Date(row.period_end_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+        email.sendRenewalReminderEmail(row.email, firstName, plan, amount, renewalDate).catch(() => {});
+      }
+
+      // Access expiring tomorrow (canceled but period_end_date is tomorrow)
+      const expiring = await pool.query<{ email: string; display_name: string | null; period_end_date: string }>(
+        `SELECT u.email, u.display_name, s.period_end_date
+         FROM subscriptions s JOIN users u ON u.id = s.user_id
+         WHERE s.status = 'canceled'
+           AND s.period_end_date::date = (CURRENT_DATE + INTERVAL '1 day')::date`
+      );
+      for (const row of expiring.rows) {
+        const firstName = row.display_name?.split(" ")[0] ?? "";
+        const expiryDate = new Date(row.period_end_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+        email.sendAccessExpiringEmail(row.email, firstName, expiryDate).catch(() => {});
+      }
+
+      // 3-day nudge: signed up 3 days ago, never subscribed
+      const nudge = await pool.query<{ email: string; display_name: string | null }>(
+        `SELECT u.email, u.display_name
+         FROM users u
+         LEFT JOIN subscriptions s ON s.user_id = u.id
+         WHERE s.id IS NULL
+           AND u.created_at::date = (CURRENT_DATE - INTERVAL '3 days')::date`
+      );
+      for (const row of nudge.rows) {
+        const firstName = row.display_name?.split(" ")[0] ?? "";
+        email.sendNeverSubscribedNudgeEmail(row.email, firstName).catch(() => {});
+      }
+
+      // 30-day win-back: canceled exactly 30 days ago
+      const winback = await pool.query<{ email: string; display_name: string | null }>(
+        `SELECT u.email, u.display_name
+         FROM subscriptions s JOIN users u ON u.id = s.user_id
+         WHERE s.status = 'canceled'
+           AND s.updated_at::date = (CURRENT_DATE - INTERVAL '30 days')::date`
+      );
+      for (const row of winback.rows) {
+        const firstName = row.display_name?.split(" ")[0] ?? "";
+        email.sendWinBackEmail(row.email, firstName).catch(() => {});
+      }
+
+    } catch (err) {
+      console.error("Daily email cron error:", err);
+    }
+  });
+} catch (err) {
+  console.error("Failed to register daily email cron:", err);
 }
 
 // ─── SPA fallback ────────────────────────────────────────────────────────────
