@@ -1,17 +1,15 @@
-import * as Brevo from "@getbrevo/brevo";
+import { BrevoClient } from "@getbrevo/brevo";
 
 const APP_URL = process.env.APP_URL ?? "https://reelmotionapp.com";
 const ADMIN_EMAIL = "romediastudios@gmail.com";
 const FROM_EMAIL = "noreply@reelmotionapp.com";
 const FROM_NAME = "ReelMotion";
 
-let _client: Brevo.TransactionalEmailsApi | null = null;
+let _client: BrevoClient | null = null;
 
-function client(): Brevo.TransactionalEmailsApi {
+function client(): BrevoClient {
   if (!_client) {
-    const api = new Brevo.TransactionalEmailsApi();
-    (api as any).authentications["apiKey"].apiKey = process.env.BREVO_API_KEY ?? "";
-    _client = api;
+    _client = new BrevoClient({ apiKey: process.env.BREVO_API_KEY ?? "" });
   }
   return _client;
 }
@@ -22,12 +20,12 @@ async function send(to: string, subject: string, html: string): Promise<void> {
     return;
   }
   try {
-    const msg = new Brevo.SendSmtpEmail();
-    msg.sender = { name: FROM_NAME, email: FROM_EMAIL };
-    msg.to = [{ email: to }];
-    msg.subject = subject;
-    msg.htmlContent = html;
-    await client().sendTransacEmail(msg);
+    await client().transactionalEmails.sendTransacEmail({
+      sender: { name: FROM_NAME, email: FROM_EMAIL },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+    });
     console.log(`[email] Sent "${subject}" to ${to}`);
   } catch (err) {
     console.error(`[email] Failed to send "${subject}" to ${to}:`, err);
@@ -43,19 +41,19 @@ function layout(body: string): string {
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <style>
-  body { margin:0; padding:0; background:#000; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif; color:#fff; }
-  .wrap { max-width:560px; margin:0 auto; padding:40px 24px; }
-  .logo { font-size:22px; font-weight:900; letter-spacing:-0.03em; margin-bottom:32px; }
-  .logo span { color:#E8001D; }
-  .card { background:#111; border:1px solid #222; border-radius:16px; padding:32px; margin-bottom:24px; }
-  h1 { font-size:22px; font-weight:900; margin:0 0 8px; }
-  p { font-size:15px; line-height:1.6; color:rgba(255,255,255,0.75); margin:0 0 16px; }
-  .btn { display:inline-block; background:#E8001D; color:#fff; text-decoration:none; font-weight:800; font-size:14px; letter-spacing:0.05em; padding:14px 28px; border-radius:10px; margin-top:8px; }
-  .divider { border:none; border-top:1px solid #222; margin:24px 0; }
-  .small { font-size:12px; color:rgba(255,255,255,0.3); line-height:1.5; }
-  .badge { display:inline-block; background:rgba(232,0,29,0.15); color:#E8001D; border:1px solid rgba(232,0,29,0.3); border-radius:6px; font-size:12px; font-weight:700; padding:4px 10px; margin-bottom:16px; }
-  .row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #1a1a1a; font-size:14px; }
-  .row .label { color:rgba(255,255,255,0.4); }
+  body{margin:0;padding:0;background:#000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#fff}
+  .wrap{max-width:560px;margin:0 auto;padding:40px 24px}
+  .logo{font-size:22px;font-weight:900;letter-spacing:-0.03em;margin-bottom:32px}
+  .logo span{color:#E8001D}
+  .card{background:#111;border:1px solid #222;border-radius:16px;padding:32px;margin-bottom:24px}
+  h1{font-size:22px;font-weight:900;margin:0 0 8px}
+  p{font-size:15px;line-height:1.6;color:rgba(255,255,255,0.75);margin:0 0 16px}
+  .btn{display:inline-block;background:#E8001D;color:#fff;text-decoration:none;font-weight:800;font-size:14px;letter-spacing:0.05em;padding:14px 28px;border-radius:10px;margin-top:8px}
+  .divider{border:none;border-top:1px solid #222;margin:24px 0}
+  .small{font-size:12px;color:rgba(255,255,255,0.3);line-height:1.5}
+  .badge{display:inline-block;background:rgba(232,0,29,0.15);color:#E8001D;border:1px solid rgba(232,0,29,0.3);border-radius:6px;font-size:12px;font-weight:700;padding:4px 10px;margin-bottom:16px}
+  .row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #1a1a1a;font-size:14px}
+  .row .label{color:rgba(255,255,255,0.4)}
 </style>
 </head>
 <body>
@@ -212,9 +210,9 @@ export async function sendNeverSubscribedNudgeEmail(to: string, firstName: strin
     </div>
     <div class="card">
       <h1 style="font-size:16px;">What you get</h1>
-      <div class="row"><span>All films & series</span><span>✓</span></div>
+      <div class="row"><span>All films &amp; series</span><span>✓</span></div>
       <div class="row"><span>Early access to new releases</span><span>✓</span></div>
-      <div class="row"><span>Filmmaker Q&As & events</span><span>✓</span></div>
+      <div class="row"><span>Filmmaker Q&amp;As &amp; events</span><span>✓</span></div>
       <div class="row"><span>Support independent film culture</span><span>✓</span></div>
     </div>
   `));
@@ -232,7 +230,7 @@ export async function sendWinBackEmail(to: string, firstName: string): Promise<v
   `));
 }
 
-// ─── Admin notification emails ─────────────────────────────────────────────────
+// ─── Admin notification emails ────────────────────────────────────────────────
 
 export async function notifyAdminNewUser(userEmail: string, displayName: string | null): Promise<void> {
   await send(ADMIN_EMAIL, `New ReelMotion sign-up: ${userEmail}`, layout(`
