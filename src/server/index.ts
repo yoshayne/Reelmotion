@@ -788,13 +788,18 @@ app.post("/api/billing/create-checkout-session", clerkAuth, async (c) => {
     [user.id, user.email, body.billingPeriod]
   );
 
-  const url = await createCheckoutSession(
-    user.id,
-    user.email,
-    body.billingPeriod,
-    customerId
-  );
-  return c.json({ url });
+  try {
+    const url = await createCheckoutSession(
+      user.id,
+      user.email,
+      body.billingPeriod,
+      customerId
+    );
+    return c.json({ url });
+  } catch (err: any) {
+    console.error("Stripe checkout error:", err);
+    return c.json({ error: err?.message ?? "Payment service unavailable. Please try again." }, 502);
+  }
 });
 
 app.post("/api/billing/create-portal-session", clerkAuth, async (c) => {
@@ -808,8 +813,13 @@ app.post("/api/billing/create-portal-session", clerkAuth, async (c) => {
     return c.json({ error: "No active subscription" }, 400);
   }
 
-  const url = await createPortalSession(sub.rows[0].stripe_customer_id);
-  return c.json({ url });
+  try {
+    const url = await createPortalSession(sub.rows[0].stripe_customer_id);
+    return c.json({ url });
+  } catch (err: any) {
+    console.error("Stripe portal error:", err);
+    return c.json({ error: err?.message ?? "Payment service unavailable. Please try again." }, 502);
+  }
 });
 
 // ─── Admin Routes ────────────────────────────────────────────────────────────

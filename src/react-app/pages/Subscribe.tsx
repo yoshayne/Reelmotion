@@ -3,10 +3,13 @@ import { Link, useNavigate } from "react-router";
 import { useUser } from "@clerk/clerk-react";
 import { apiFetch } from "@/react-app/utils/api";
 import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
+import { useNativeSession } from "@/react-app/hooks/useNativeSession";
 import { Check, Film, Users, Zap, Heart, Crown } from "lucide-react";
 
 export default function SubscribePage() {
-  const { user, isLoaded } = useUser();
+  const { user: clerkUser, isLoaded } = useUser();
+  const { nativeUser } = useNativeSession();
+  const user = clerkUser ?? (nativeUser ? { id: nativeUser.id } : null);
   const { logo, tagline } = useBrandAssets();
   const navigate = useNavigate();
   const [selected, setSelected] = useState<"monthly" | "yearly">("yearly");
