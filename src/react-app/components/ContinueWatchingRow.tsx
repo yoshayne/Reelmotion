@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Play, Clock } from "lucide-react";
 import { useNavigate } from "react-router";
 import type { PlaybackHistory } from "@/shared/types";
+import { getThumbnailUrl } from "@/react-app/utils/thumbnail";
 
 interface ContinueWatchingRowProps {
   items: PlaybackHistory[];
@@ -69,9 +70,9 @@ export default function ContinueWatchingRow({ items }: ContinueWatchingRowProps)
                 className="group relative flex-shrink-0 w-56 md:w-72 cursor-pointer"
               >
                 <div className="relative aspect-video rounded-xl overflow-hidden border border-red-600/20 transition-all duration-300 group-hover:border-red-600/50 group-hover:shadow-lg group-hover:shadow-red-600/20">
-                  {item.thumbnail_url ? (
+                  {getThumbnailUrl(item.thumbnail_url, item.mux_playback_id, item.mux_duration_seconds) ? (
                     <img
-                      src={item.thumbnail_url}
+                      src={getThumbnailUrl(item.thumbnail_url, item.mux_playback_id, item.mux_duration_seconds)!}
                       alt={item.title}
                       loading="lazy"
                       className="w-full h-full object-cover"

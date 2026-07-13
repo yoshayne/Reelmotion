@@ -114,7 +114,9 @@ export interface PlaybackHistory {
   // joined
   title?: string;
   thumbnail_url?: string | null;
+  mux_playback_id?: string | null;
   mux_duration?: number | null;
+  mux_duration_seconds?: number | null;
   series_id?: number | null;
   slug?: string;
 }

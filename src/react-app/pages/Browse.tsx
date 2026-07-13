@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { useUser } from "@clerk/clerk-react";
 import { Play, BookmarkPlus, BookmarkCheck, X } from "lucide-react";
 import { apiFetch } from "@/react-app/utils/api";
+import { getThumbnailUrl } from "@/react-app/utils/thumbnail";
 import type { BrowseData, Video, Series, CarouselItem, PromoPopup } from "@/shared/types";
 import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
 
@@ -144,12 +145,13 @@ export default function Browse() {
   }
 
   // Poster card (2:3 aspect ratio)
-  function PosterCard({ image, title, onClick, badge }: { image?: string | null; title: string; onClick: () => void; badge?: React.ReactNode }) {
+  function PosterCard({ image, muxPlaybackId, muxDuration, title, onClick, badge }: { image?: string | null; muxPlaybackId?: string | null; muxDuration?: number | null; title: string; onClick: () => void; badge?: React.ReactNode }) {
+    const imgSrc = getThumbnailUrl(image, muxPlaybackId, muxDuration);
     return (
       <div onClick={onClick} className="flex-shrink-0 cursor-pointer" style={{ width: 160 }}>
         <div className="relative overflow-hidden" style={{ aspectRatio: '2/3', clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)' }}>
-          {image ? (
-            <img src={image} alt={title} className="w-full h-full object-cover" />
+          {imgSrc ? (
+            <img src={imgSrc} alt={title} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
               <Play className="w-8 h-8 text-zinc-700" />
@@ -294,8 +296,8 @@ export default function Browse() {
               {continueWatching.map((item: any) => (
                 <div key={item.id} onClick={() => navigate(`/watch/${item.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 180 }}>
                   <div className="relative overflow-hidden rounded" style={{ height: 102, clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%)' }}>
-                    {item.thumbnail_url ? (
-                      <img src={item.thumbnail_url} alt={item.title} className="w-full h-full object-cover" />
+                    {getThumbnailUrl(item.thumbnail_url, item.mux_playback_id, item.mux_duration) ? (
+                      <img src={getThumbnailUrl(item.thumbnail_url, item.mux_playback_id, item.mux_duration)!} alt={item.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full bg-zinc-900" />
                     )}
@@ -351,6 +353,8 @@ export default function Browse() {
                 <PosterCard
                   key={v.id}
                   image={v.thumbnail_url}
+                  muxPlaybackId={v.mux_playback_id}
+                  muxDuration={v.mux_duration}
                   title={v.title}
                   onClick={() => navigate(`/watch/${v.id}`)}
                   badge={
@@ -373,6 +377,8 @@ export default function Browse() {
                 <PosterCard
                   key={v.id}
                   image={v.thumbnail_url}
+                  muxPlaybackId={v.mux_playback_id}
+                  muxDuration={v.mux_duration}
                   title={v.title}
                   onClick={() => navigate(`/watch/${v.id}`)}
                   badge={v.is_free ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span> : undefined}
@@ -391,8 +397,8 @@ export default function Browse() {
                 {clips.slice(0, 10).map((v: Video) => (
                   <div key={v.id} onClick={() => navigate(`/watch/${v.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 120 }}>
                     <div className="relative overflow-hidden" style={{ aspectRatio: '9/16', clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)' }}>
-                      {v.thumbnail_url ? (
-                        <img src={v.thumbnail_url} alt={v.title} className="w-full h-full object-cover" />
+                      {getThumbnailUrl(v.thumbnail_url, v.mux_playback_id, v.mux_duration) ? (
+                        <img src={getThumbnailUrl(v.thumbnail_url, v.mux_playback_id, v.mux_duration)!} alt={v.title} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full bg-zinc-900" />
                       )}

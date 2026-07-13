@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router";
 import { Play, Lock, Info } from "lucide-react";
 import type { Video } from "@/shared/types";
+import { getThumbnailUrl } from "@/react-app/utils/thumbnail";
 
 interface VideoCardProps {
   video: Video;
@@ -33,7 +34,8 @@ export default function VideoCard({ video, hasAccess = false, showProgress = fal
     }
   };
 
-  const imageUrl = video.thumbnail_url || video.carousel_image_url || video.hero_image_url;
+  const imageUrl =
+    getThumbnailUrl(video.thumbnail_url || video.carousel_image_url || video.hero_image_url, video.mux_playback_id, video.mux_duration);
 
   return (
     <div
