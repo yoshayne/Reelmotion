@@ -544,34 +544,62 @@ export default function Browse() {
           </div>
         )}
 
-        {/* Coming Soon section */}
-        {(activeTab === "all" || activeTab === "new") && (browseData?.coming_soon?.length ?? 0) > 0 && (
-          <div className="mt-7 mb-2">
-            <SectionHead eyebrow="COMING UP" title="Coming Soon" />
-            <ScrollRow>
-              {(browseData!.coming_soon as Video[]).map((v: Video) => {
-                const releaseLabel = v.release_date
-                  ? new Date(v.release_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-                  : null;
-                return (
-                  <PosterCard
-                    key={v.id}
-                    image={v.thumbnail_url}
-                    muxPlaybackId={v.mux_playback_id}
-                    muxDuration={v.mux_duration}
-                    title={v.title}
-                    onClick={() => {}}
-                    badge={
-                      <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest text-white" style={{ backgroundColor: '#6b21a8' }}>
-                        {releaseLabel ? releaseLabel.toUpperCase() : "COMING SOON"}
-                      </span>
-                    }
-                  />
-                );
-              })}
-            </ScrollRow>
-          </div>
-        )}
+        {/* Coming Soon section — deduplicate episodes into series */}
+        {(activeTab === "all" || activeTab === "new") && (() => {
+          const comingSoonVideos: Video[] = browseData?.coming_soon ?? [];
+          if (!comingSoonVideos.length) return null;
+          const seriesMap = new Map(allSeries.map(s => [s.id, s]));
+          const seenSeriesIds = new Set<number>();
+          type CSCard = { key: string; image: string | null; title: string; releaseDate: string | null; onClick: () => void };
+          const cards: CSCard[] = [];
+          for (const v of comingSoonVideos) {
+            if (v.series_id && v.content_type === "episode") {
+              if (seenSeriesIds.has(v.series_id)) continue;
+              seenSeriesIds.add(v.series_id);
+              const s = seriesMap.get(v.series_id);
+              cards.push({
+                key: `series-${v.series_id}`,
+                image: s?.cover_image_url || s?.carousel_image_url || v.thumbnail_url,
+                title: s?.title ?? v.title,
+                releaseDate: v.release_date,
+                onClick: () => s && navigate(`/series/${s.id}`),
+              });
+            } else {
+              cards.push({
+                key: `video-${v.id}`,
+                image: v.thumbnail_url,
+                title: v.title,
+                releaseDate: v.release_date,
+                onClick: () => {},
+              });
+            }
+          }
+          return (
+            <div className="mt-7 mb-2">
+              <SectionHead eyebrow="COMING UP" title="Coming Soon" />
+              <ScrollRow>
+                {cards.map(card => {
+                  const releaseLabel = card.releaseDate
+                    ? new Date(card.releaseDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                    : null;
+                  return (
+                    <PosterCard
+                      key={card.key}
+                      image={card.image}
+                      title={card.title}
+                      onClick={card.onClick}
+                      badge={
+                        <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest text-white" style={{ backgroundColor: '#6b21a8' }}>
+                          {releaseLabel ? releaseLabel.toUpperCase() : "COMING SOON"}
+                        </span>
+                      }
+                    />
+                  );
+                })}
+              </ScrollRow>
+            </div>
+          );
+        })()}
 
         {/* Movies section */}
         {(activeTab === "all" || activeTab === "movies") && movies.length > 0 && (
