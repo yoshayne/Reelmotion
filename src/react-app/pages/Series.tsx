@@ -3,8 +3,15 @@ import { useParams, useNavigate, Link } from "react-router";
 import { useUser } from "@clerk/clerk-react";
 import { apiFetch } from "@/react-app/utils/api";
 import { hasAccess } from "@/react-app/utils/access";
+import { getThumbnailUrl } from "@/react-app/utils/thumbnail";
 import type { Series, Video, Subscription } from "@/shared/types";
 import { Play, Lock, ChevronLeft } from "lucide-react";
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+function isNew(createdAt?: string | null) {
+  if (!createdAt) return false;
+  return Date.now() - new Date(createdAt).getTime() < SEVEN_DAYS_MS;
+}
 
 export default function SeriesPage() {
   const { id } = useParams<{ id: string }>();
@@ -122,12 +129,18 @@ export default function SeriesPage() {
               <div className="space-y-3">
                 {seasonEpisodes.map((ep) => {
                   const canWatch = userHasAccess || ep.is_free;
-                  const epImage = ep.hero_image_url || ep.thumbnail_url || ep.carousel_image_url || imageUrl;
+                  const epImage = getThumbnailUrl(
+                    ep.hero_image_url || ep.thumbnail_url || ep.carousel_image_url || imageUrl,
+                    ep.mux_playback_id,
+                    ep.mux_duration
+                  );
+                  const episodeIsNew = isNew(ep.created_at);
                   return (
                     <div
                       key={ep.id}
                       onClick={() => navigate(`/watch/${ep.id}`)}
                       className="flex gap-3 p-3 bg-gray-900/50 border border-gray-800 rounded-xl cursor-pointer hover:border-red-600/40 transition-colors group"
+                      style={episodeIsNew ? { borderColor: 'rgba(232,0,29,0.25)' } : undefined}
                     >
                       <div className="relative flex-shrink-0 w-32 aspect-video rounded-lg overflow-hidden bg-gray-800">
                         {epImage ? (
@@ -137,6 +150,11 @@ export default function SeriesPage() {
                             className="w-full h-full object-cover"
                           />
                         ) : null}
+                        {episodeIsNew && (
+                          <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest" style={{ backgroundColor: '#E8001D' }}>
+                            NEW
+                          </div>
+                        )}
                         <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
                           {canWatch ? (
                             <Play className="w-8 h-8 fill-white" />

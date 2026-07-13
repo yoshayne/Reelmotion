@@ -102,11 +102,39 @@ export default function Browse() {
   const sortFreeFirst = (arr: Video[]) =>
     [...arr].sort((a, b) => (b.is_free ? 1 : 0) - (a.is_free ? 1 : 0));
 
-  const newVideos = sortFreeFirst(allVideos.filter(v => {
+  const rawNewVideos = allVideos.filter(v => {
     if (!v.created_at) return false;
-    const d = new Date(v.created_at);
-    return (Date.now() - d.getTime()) < 7 * 24 * 60 * 60 * 1000;
-  }));
+    return (Date.now() - new Date(v.created_at).getTime()) < 7 * 24 * 60 * 60 * 1000;
+  });
+
+  // Build deduplicated "new" cards:
+  // - Episodes with a series_id → show the series poster once, navigate to series page
+  // - Movies / clips / standalone episodes → show as-is
+  type NewCard =
+    | { kind: "series"; series: Series; isFree: boolean }
+    | { kind: "video"; video: Video };
+
+  const newCards: NewCard[] = (() => {
+    const seenSeriesIds = new Set<number>();
+    const cards: NewCard[] = [];
+    const seriesMap = new Map(allSeries.map(s => [s.id, s]));
+    for (const v of rawNewVideos) {
+      if (v.series_id && v.content_type === "episode") {
+        if (!seenSeriesIds.has(v.series_id)) {
+          const series = seriesMap.get(v.series_id);
+          if (series) {
+            seenSeriesIds.add(v.series_id);
+            cards.push({ kind: "series", series, isFree: v.is_free });
+          } else {
+            cards.push({ kind: "video", video: v });
+          }
+        }
+      } else {
+        cards.push({ kind: "video", video: v });
+      }
+    }
+    return cards;
+  })();
   const movies = sortFreeFirst(allVideos.filter(v => v.content_type === "movie"));
   const clips = sortFreeFirst(allVideos.filter(v => v.content_type === "clip"));
 
@@ -345,25 +373,43 @@ export default function Browse() {
         )}
 
         {/* New section */}
-        {(activeTab === "all" || activeTab === "new") && newVideos.length > 0 && (
+        {(activeTab === "all" || activeTab === "new") && newCards.length > 0 && (
           <div className="mt-7 mb-2">
             <SectionHead eyebrow="JUST DROPPED" title="New" onSeeAll={() => setActiveTab("new")} />
             <ScrollRow>
-              {newVideos.slice(0, 10).map((v: Video) => (
-                <PosterCard
-                  key={v.id}
-                  image={v.thumbnail_url}
-                  muxPlaybackId={v.mux_playback_id}
-                  muxDuration={v.mux_duration}
-                  title={v.title}
-                  onClick={() => navigate(`/watch/${v.id}`)}
-                  badge={
-                    v.is_free
-                      ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span>
-                      : <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest" style={{ backgroundColor: '#E8001D' }}>NEW</span>
-                  }
-                />
-              ))}
+              {newCards.slice(0, 10).map((card) => {
+                if (card.kind === "series") {
+                  return (
+                    <PosterCard
+                      key={`series-${card.series.id}`}
+                      image={card.series.cover_image_url || card.series.carousel_image_url}
+                      title={card.series.title}
+                      onClick={() => navigate(`/series/${card.series.id}`)}
+                      badge={
+                        card.isFree
+                          ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span>
+                          : <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest" style={{ backgroundColor: '#E8001D' }}>NEW</span>
+                      }
+                    />
+                  );
+                }
+                const v = card.video;
+                return (
+                  <PosterCard
+                    key={`video-${v.id}`}
+                    image={v.thumbnail_url}
+                    muxPlaybackId={v.mux_playback_id}
+                    muxDuration={v.mux_duration}
+                    title={v.title}
+                    onClick={() => navigate(v.content_type === "episode" ? `/watch/${v.id}` : `/movie-info/${v.id}`)}
+                    badge={
+                      v.is_free
+                        ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span>
+                        : <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest" style={{ backgroundColor: '#E8001D' }}>NEW</span>
+                    }
+                  />
+                );
+              })}
             </ScrollRow>
           </div>
         )}
