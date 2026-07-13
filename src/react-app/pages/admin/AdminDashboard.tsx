@@ -4,7 +4,7 @@ import { useAdminRole } from "@/react-app/hooks/useAdminRole";
 import { apiFetch } from "@/react-app/utils/api";
 import {
   Film, Layers, Image, Users, Star, AlignLeft, Megaphone, BarChart2, MessageSquare,
-  TrendingUp, DollarSign, Clock, Play, UserPlus, Activity,
+  TrendingUp, DollarSign, Clock, Play, UserPlus, Activity, PieChart,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -103,6 +103,7 @@ export default function AdminDashboard() {
   }, [isCreator]);
 
   const navItems = [
+    { to: "/admin/analytics/content", icon: PieChart, label: "Content Analytics", count: null },
     { to: "/admin/videos", icon: Film, label: "Videos", count: kpis?.totalVideos },
     { to: "/admin/series", icon: Layers, label: "Series", count: kpis?.totalSeries },
     { to: "/admin/carousel", icon: Image, label: "Carousel", count: null },

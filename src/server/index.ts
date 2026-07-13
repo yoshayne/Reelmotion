@@ -1419,6 +1419,92 @@ app.get("/api/admin/analytics/charts", clerkAuth, adminAuth, async (c) => {
   return c.json({ subscriberChart, signupsChart, watchChart });
 });
 
+app.get("/api/admin/analytics/content", clerkAuth, adminAuth, async (c) => {
+  const [videos, series] = await Promise.all([
+    query<{
+      video_id: string; title: string; slug: string; content_type: string;
+      thumbnail_url: string | null; mux_playback_id: string | null; mux_duration: string | null;
+      views: string; unique_viewers: string; completions: string; total_seconds: string;
+    }>(`
+      SELECT
+        v.id::text AS video_id,
+        v.title,
+        v.slug,
+        v.content_type,
+        v.thumbnail_url,
+        v.mux_playback_id,
+        v.mux_duration::text,
+        COUNT(ph.id)::text AS views,
+        COUNT(DISTINCT ph.user_id)::text AS unique_viewers,
+        COUNT(*) FILTER (WHERE ph.completed = true)::text AS completions,
+        COALESCE(SUM(ph.last_position_seconds), 0)::text AS total_seconds
+      FROM videos v
+      LEFT JOIN playback_history ph ON ph.video_id = v.id
+      WHERE v.is_published = true
+      GROUP BY v.id, v.title, v.slug, v.content_type, v.thumbnail_url, v.mux_playback_id, v.mux_duration
+      ORDER BY views DESC
+      LIMIT 50
+    `),
+    query<{
+      series_id: string; title: string; slug: string;
+      cover_image_url: string | null; episode_count: string;
+      views: string; unique_viewers: string; completions: string; total_seconds: string;
+    }>(`
+      SELECT
+        s.id::text AS series_id,
+        s.title,
+        s.slug,
+        s.cover_image_url,
+        COUNT(DISTINCT v.id)::text AS episode_count,
+        COUNT(ph.id)::text AS views,
+        COUNT(DISTINCT ph.user_id)::text AS unique_viewers,
+        COUNT(*) FILTER (WHERE ph.completed = true)::text AS completions,
+        COALESCE(SUM(ph.last_position_seconds), 0)::text AS total_seconds
+      FROM series s
+      LEFT JOIN videos v ON v.series_id = s.id AND v.is_published = true
+      LEFT JOIN playback_history ph ON ph.video_id = v.id
+      GROUP BY s.id, s.title, s.slug, s.cover_image_url
+      ORDER BY views DESC
+      LIMIT 30
+    `),
+  ]);
+
+  const toContent = (r: typeof videos.rows[0]) => ({
+    videoId: Number(r.video_id),
+    title: r.title,
+    slug: r.slug,
+    contentType: r.content_type,
+    thumbnailUrl: r.thumbnail_url,
+    muxPlaybackId: r.mux_playback_id,
+    muxDuration: r.mux_duration ? Number(r.mux_duration) : null,
+    views: Number(r.views),
+    uniqueViewers: Number(r.unique_viewers),
+    completionRate: Number(r.views) > 0
+      ? Math.round((Number(r.completions) / Number(r.views)) * 1000) / 10
+      : 0,
+    watchHours: Math.round(Number(r.total_seconds) / 360) / 10,
+  });
+
+  const toSeriesContent = (r: typeof series.rows[0]) => ({
+    seriesId: Number(r.series_id),
+    title: r.title,
+    slug: r.slug,
+    coverImageUrl: r.cover_image_url,
+    episodeCount: Number(r.episode_count),
+    views: Number(r.views),
+    uniqueViewers: Number(r.unique_viewers),
+    completionRate: Number(r.views) > 0
+      ? Math.round((Number(r.completions) / Number(r.views)) * 1000) / 10
+      : 0,
+    watchHours: Math.round(Number(r.total_seconds) / 360) / 10,
+  });
+
+  return c.json({
+    videos: videos.rows.map(toContent),
+    series: series.rows.map(toSeriesContent),
+  });
+});
+
 // ─── Comments ────────────────────────────────────────────────────────────────
 
 // GET /api/videos/:id/comments — public, returns array directly
