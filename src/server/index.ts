@@ -1715,6 +1715,30 @@ app.delete("/api/admin/video-rights/:id", clerkAuth, adminAuth, async (c) => {
   return c.json({ success: true });
 });
 
+// Assign rights holder to all published episodes of a series at once
+app.post("/api/admin/video-rights/series", clerkAuth, adminAuth, async (c) => {
+  const body = await c.req.json<{ series_id: number; rights_holder_id: number; royalty_percent: number }>();
+  const episodes = await query<{ id: number }>(
+    "SELECT id FROM videos WHERE series_id=$1 AND is_published=true",
+    [body.series_id]
+  );
+  if (episodes.rows.length === 0) {
+    return c.json({ error: "No published episodes found for this series" }, 404);
+  }
+  const inserted: unknown[] = [];
+  for (const ep of episodes.rows) {
+    const r = await query(
+      `INSERT INTO video_rights (video_id, rights_holder_id, royalty_percent)
+       VALUES ($1,$2,$3)
+       ON CONFLICT (video_id, rights_holder_id) DO UPDATE SET royalty_percent=$3
+       RETURNING *`,
+      [ep.id, body.rights_holder_id, body.royalty_percent]
+    );
+    inserted.push(r.rows[0]);
+  }
+  return c.json({ assigned: inserted.length, records: inserted });
+});
+
 // Royalty overview
 app.get("/api/admin/royalties/overview", clerkAuth, adminAuth, async (c) => {
   const [pool, statements, watchTotals] = await Promise.all([

@@ -77,6 +77,7 @@ interface Overview {
 }
 
 interface VideoOption { id: number; title: string; content_type: string; }
+interface SeriesOption { id: number; title: string; }
 
 type Tab = "overview" | "rights" | "statements";
 
@@ -112,13 +113,15 @@ export default function AdminRoyalties() {
   const [statements, setStatements] = useState<Statement[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [videos, setVideos] = useState<VideoOption[]>([]);
+  const [seriesList, setSeriesList] = useState<SeriesOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<string>("");
 
   // Modals
   const [holderModal, setHolderModal] = useState<Partial<RightsHolder> | null>(null);
   const [rightsModal, setRightsModal] = useState(false);
-  const [rightsForm, setRightsForm] = useState({ video_id: "", rights_holder_id: "", royalty_percent: "50" });
+  const [assignMode, setAssignMode] = useState<"video" | "series">("series");
+  const [rightsForm, setRightsForm] = useState({ target_id: "", rights_holder_id: "", royalty_percent: "50" });
   const [calculating, setCalculating] = useState(false);
   const [calcPeriod, setCalcPeriod] = useState(() => {
     const n = new Date();
@@ -133,18 +136,20 @@ export default function AdminRoyalties() {
   const loadAll = useCallback(async () => {
     if (!isCreator) return;
     setLoading(true);
-    const [ov, h, vr, p, v] = await Promise.all([
+    const [ov, h, vr, p, v, s] = await Promise.all([
       apiFetch("/api/admin/royalties/overview").then(r => r.json() as Promise<Overview>),
       apiFetch("/api/admin/rights-holders").then(r => r.json() as Promise<RightsHolder[]>),
       apiFetch("/api/admin/video-rights").then(r => r.json() as Promise<VideoRight[]>),
       apiFetch("/api/admin/royalties/periods").then(r => r.json() as Promise<Period[]>),
       apiFetch("/api/admin/videos").then(r => r.json() as Promise<VideoOption[]>),
+      apiFetch("/api/admin/series").then(r => r.json() as Promise<SeriesOption[]>),
     ]);
     setOverview(ov);
     setHolders(h);
     setVideoRights(vr);
     setPeriods(p);
     setVideos(v);
+    setSeriesList(s);
     if (p.length > 0 && !selectedPeriod) setSelectedPeriod(p[0].period);
     setLoading(false);
   }, [isCreator, selectedPeriod]);
@@ -176,17 +181,30 @@ export default function AdminRoyalties() {
 
   // ── Video Rights ──
   async function saveVideoRight() {
-    await apiFetch("/api/admin/video-rights", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        video_id: Number(rightsForm.video_id),
-        rights_holder_id: Number(rightsForm.rights_holder_id),
-        royalty_percent: Number(rightsForm.royalty_percent),
-      }),
-    });
+    const payload = {
+      rights_holder_id: Number(rightsForm.rights_holder_id),
+      royalty_percent: Number(rightsForm.royalty_percent),
+    };
+    if (assignMode === "series") {
+      const res = await apiFetch("/api/admin/video-rights/series", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, series_id: Number(rightsForm.target_id) }),
+      });
+      if (!res.ok) {
+        const err = await res.json() as { error: string };
+        alert(err.error ?? "Failed to assign");
+        return;
+      }
+    } else {
+      await apiFetch("/api/admin/video-rights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, video_id: Number(rightsForm.target_id) }),
+      });
+    }
     setRightsModal(false);
-    setRightsForm({ video_id: "", rights_holder_id: "", royalty_percent: "50" });
+    setRightsForm({ target_id: "", rights_holder_id: "", royalty_percent: "50" });
     loadAll();
   }
 
@@ -648,24 +666,47 @@ export default function AdminRoyalties() {
       {rightsModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold">Assign Video Rights</h2>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold">Assign Rights</h2>
               <button onClick={() => setRightsModal(false)}><X className="w-5 h-5 text-gray-500" /></button>
             </div>
+
+            {/* Mode toggle */}
+            <div className="flex gap-1 bg-gray-800 rounded-lg p-1 mb-5">
+              {(["series", "video"] as const).map(m => (
+                <button
+                  key={m}
+                  onClick={() => { setAssignMode(m); setRightsForm(f => ({ ...f, target_id: "" })); }}
+                  className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    assignMode === m ? "bg-red-600 text-white" : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  {m === "series" ? "Series (all episodes)" : "Single Video"}
+                </button>
+              ))}
+            </div>
+
             <div className="space-y-4">
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Video *</label>
+                <label className="text-xs text-gray-500 block mb-1">
+                  {assignMode === "series" ? "Series *" : "Video *"}
+                </label>
                 <select
-                  value={rightsForm.video_id}
-                  onChange={e => setRightsForm(f => ({ ...f, video_id: e.target.value }))}
+                  value={rightsForm.target_id}
+                  onChange={e => setRightsForm(f => ({ ...f, target_id: e.target.value }))}
                   className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-600"
                 >
-                  <option value="">Select a video…</option>
-                  {videos.map(v => (
-                    <option key={v.id} value={v.id}>{v.title}</option>
-                  ))}
+                  <option value="">Select {assignMode === "series" ? "a series" : "a video"}…</option>
+                  {assignMode === "series"
+                    ? seriesList.map(s => <option key={s.id} value={s.id}>{s.title}</option>)
+                    : videos.map(v => <option key={v.id} value={v.id}>{v.title}</option>)
+                  }
                 </select>
+                {assignMode === "series" && (
+                  <p className="text-xs text-gray-600 mt-1">Assigns to all published episodes in the series</p>
+                )}
               </div>
+
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Rights Holder *</label>
                 <select
@@ -679,9 +720,10 @@ export default function AdminRoyalties() {
                   ))}
                 </select>
               </div>
+
               <div>
                 <label className="text-xs text-gray-500 block mb-1">
-                  Royalty % <span className="text-gray-600">(of this video's revenue share)</span>
+                  Royalty % <span className="text-gray-600">(of this content's revenue share)</span>
                 </label>
                 <input
                   type="number"
@@ -694,13 +736,14 @@ export default function AdminRoyalties() {
                 />
               </div>
             </div>
+
             <div className="flex gap-3 mt-6">
               <button
                 onClick={saveVideoRight}
-                disabled={!rightsForm.video_id || !rightsForm.rights_holder_id}
+                disabled={!rightsForm.target_id || !rightsForm.rights_holder_id}
                 className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-40 rounded-lg font-medium text-sm transition-colors"
               >
-                Assign
+                {assignMode === "series" ? "Assign to All Episodes" : "Assign"}
               </button>
               <button
                 onClick={() => setRightsModal(false)}
