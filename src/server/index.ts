@@ -578,14 +578,27 @@ app.get("/api/public/cover-art", async (c) => {
 });
 
 app.get("/api/promo-popup", async (c) => {
-  const result = await query(
-    `SELECT * FROM promo_popups
-     WHERE is_active = true
-       AND (start_date IS NULL OR start_date <= CURRENT_DATE)
-       AND (end_date IS NULL OR end_date >= CURRENT_DATE)
-     ORDER BY created_at DESC LIMIT 1`
-  );
-  return c.json(result.rows[0] || null);
+  const data = await getCached("promo-popup", 60, async () => {
+    const result = await query(
+      `SELECT * FROM promo_popups
+       WHERE is_active = true
+         AND (start_date IS NULL OR start_date <= CURRENT_DATE)
+         AND (end_date IS NULL OR end_date >= CURRENT_DATE)
+       ORDER BY created_at DESC LIMIT 1`
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    // Pre-resolve the image URL so the browser can fetch it in one hop
+    if (row.image_key) {
+      try {
+        row.image_url = getPublicUrl(row.image_key);
+      } catch {
+        row.image_url = null;
+      }
+    }
+    return row;
+  });
+  return c.json(data);
 });
 
 app.get("/api/images/*", async (c) => {
@@ -1245,6 +1258,7 @@ app.post("/api/admin/promo-popups", clerkAuth, adminAuth, async (c) => {
       body.is_active ?? false, body.start_date, body.end_date,
     ]
   );
+  await invalidateCache("promo-popup");
   return c.json(result.rows[0], 201);
 });
 
@@ -1277,12 +1291,14 @@ app.patch("/api/admin/promo-popups/:id", clerkAuth, adminAuth, async (c) => {
     ]
   );
   if (!result.rows[0]) return c.json({ error: "Not found" }, 404);
+  await invalidateCache("promo-popup");
   return c.json(result.rows[0]);
 });
 
 app.delete("/api/admin/promo-popups/:id", clerkAuth, adminAuth, async (c) => {
   const id = Number(c.req.param("id"));
   await query("DELETE FROM promo_popups WHERE id = $1", [id]);
+  await invalidateCache("promo-popup");
   return c.json({ success: true });
 });
 

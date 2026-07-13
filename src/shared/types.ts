@@ -144,6 +144,7 @@ export interface PromoPopup {
   id: number;
   title: string;
   image_key: string;
+  image_url?: string | null;
   link_type: "video" | "series" | "custom" | null;
   link_video_id: number | null;
   link_series_id: number | null;

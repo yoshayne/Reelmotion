@@ -27,9 +27,27 @@ export default function Browse() {
     if (isLoaded && !isSignedIn) navigate("/", { replace: true });
   }, [isLoaded, isSignedIn, navigate]);
 
+  // Fetch promo popup immediately — it's public and cached, no auth needed
+  useEffect(() => {
+    fetch("/api/promo-popup").then(r => r.json()).then((promo: PromoPopup | null) => {
+      if (!promo?.id) return;
+      setPromoPopup(promo);
+      const key = `promo_seen_${promo.id}`;
+      const lastSeen = localStorage.getItem(key);
+      let shouldShow = false;
+      if (promo.frequency === "always") {
+        shouldShow = true;
+      } else if (promo.frequency === "once_ever") {
+        shouldShow = !lastSeen;
+      } else {
+        shouldShow = lastSeen !== new Date().toDateString();
+      }
+      if (shouldShow) setShowPromo(true);
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     // Wait for Clerk to finish loading before fetching auth-gated endpoints.
-    // Without this, apiFetch sends no token, gets 401, and catches return [].
     if (!isLoaded) return;
 
     // Reset user-specific state before fetching so stale data from a previous
@@ -39,27 +57,10 @@ export default function Browse() {
 
     Promise.all([
       apiFetch("/api/browse-data").then(r => r.json()),
-      apiFetch("/api/promo-popup").then(r => r.json()).catch(() => null),
       isSignedIn ? apiFetch("/api/watchlist").then(r => r.json()).catch(() => []) : Promise.resolve([]),
       isSignedIn ? apiFetch("/api/playback-history").then(r => r.json()).catch(() => []) : Promise.resolve([]),
-    ]).then(([data, promo, wl, history]) => {
+    ]).then(([data, wl, history]) => {
       setBrowseData(data);
-      if (promo?.id) {
-        setPromoPopup(promo);
-        const key = `promo_seen_${promo.id}`;
-        const lastSeen = localStorage.getItem(key);
-        let shouldShow = false;
-        if (promo.frequency === "always") {
-          shouldShow = true;
-        } else if (promo.frequency === "once_ever") {
-          shouldShow = !lastSeen;
-        } else {
-          // once_per_day — check if last seen was before today
-          const today = new Date().toDateString();
-          shouldShow = lastSeen !== today;
-        }
-        if (shouldShow) setShowPromo(true);
-      }
       if (Array.isArray(wl)) setWatchlist(new Set((wl as any[]).map((i: any) => i.video_id || i.id)));
       if (Array.isArray(history) && history.length > 0) {
         setContinueWatching(history.slice(0, 10));
@@ -227,9 +228,9 @@ export default function Browse() {
               <button onClick={() => { markSeen(); setShowPromo(false); }} className="absolute -top-3 -right-3 z-10 w-8 h-8 bg-black rounded-full flex items-center justify-center border border-white/20">
                 <X className="w-4 h-4" />
               </button>
-              {promoPopup.image_key && (
+              {(promoPopup.image_url || promoPopup.image_key) && (
                 <img
-                  src={`/api/images/${encodeURIComponent(promoPopup.image_key)}`}
+                  src={promoPopup.image_url ?? `/api/images/${encodeURIComponent(promoPopup.image_key!)}`}
                   alt={promoPopup.title}
                   onClick={hasLink ? handlePromoClick : undefined}
                   className={`w-full rounded-xl block${hasLink ? " cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
