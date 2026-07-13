@@ -172,8 +172,12 @@ export default function Browse() {
     [...arr].sort((a, b) => (b.is_free ? 1 : 0) - (a.is_free ? 1 : 0));
 
   const rawNewVideos = allVideos.filter(v => {
-    if (!v.created_at) return false;
-    return (Date.now() - new Date(v.created_at).getTime()) < 7 * 24 * 60 * 60 * 1000;
+    // Exclude future-dated content
+    if (v.release_date && new Date(v.release_date) > new Date()) return false;
+    // "New" = released/added within the last 7 days (prefer release_date over created_at)
+    const dateStr = v.release_date || v.created_at;
+    if (!dateStr) return false;
+    return (Date.now() - new Date(dateStr).getTime()) < 7 * 24 * 60 * 60 * 1000;
   });
 
   // Build deduplicated "new" cards:

@@ -470,6 +470,7 @@ app.get("/api/browse-data", async (c) => {
            FROM videos v
            LEFT JOIN series s ON v.series_id = s.id
            WHERE v.is_published = true
+             AND (v.release_date IS NULL OR v.release_date <= CURRENT_DATE)
            ORDER BY v.release_date DESC NULLS LAST, v.created_at DESC`
         ),
         query(`SELECT * FROM series ORDER BY created_at DESC`),
