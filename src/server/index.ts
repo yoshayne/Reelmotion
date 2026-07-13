@@ -573,7 +573,7 @@ app.get("/api/series/:id/episodes", async (c) => {
   const result = await query(
     `SELECT * FROM videos
      WHERE series_id = $1 AND is_published = true
-     ORDER BY season_number ASC NULLS LAST, episode_number ASC NULLS LAST`,
+     ORDER BY season_number ASC NULLS LAST, episode_number ASC NULLS LAST, release_date ASC NULLS LAST`,
     [seriesId]
   );
   return c.json((result.rows as Record<string, unknown>[]).map(v => proxyImages(v, ["thumbnail_url", "hero_image_url", "carousel_image_url"])));

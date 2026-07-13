@@ -283,6 +283,7 @@ export default function WatchPage() {
   const { video, nextEpisode } = watchData;
   const userHasAccess = hasAccess(subscription);
   const canWatch = userHasAccess || video.is_free;
+  const isFutureRelease = !!(video.release_date && new Date(video.release_date) > new Date());
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -306,7 +307,22 @@ export default function WatchPage() {
 
         {/* Player — constrained, never full-bleed */}
         <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
-          {canWatch ? (
+          {isFutureRelease ? (
+            <div className="relative flex flex-col items-center justify-center gap-4 px-4 py-16 bg-zinc-900">
+              {video.thumbnail_url && (
+                <img src={video.thumbnail_url} alt={video.title} className="absolute inset-0 w-full h-full object-cover opacity-15" />
+              )}
+              <div className="relative z-10 flex flex-col items-center gap-4 text-center">
+                <div className="p-4 rounded-full" style={{ backgroundColor: 'rgba(107,33,168,0.3)' }}>
+                  <span className="text-3xl">🎬</span>
+                </div>
+                <h3 className="text-xl font-black">Coming Soon</h3>
+                <p className="text-sm max-w-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                  Available {new Date(video.release_date!).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                </p>
+              </div>
+            </div>
+          ) : canWatch ? (
             <MuxPlayerWrapper
               video={video}
               startTime={startTime}
