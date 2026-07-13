@@ -337,35 +337,60 @@ export default function Browse() {
         <div className="absolute inset-0" style={{ background: 'linear-gradient(125deg, rgba(232,0,29,0.55) 0%, transparent 42%)', zIndex: 1 }} />
 
         {/* Content pinned to bottom-left with consistent margin */}
-        <div className="absolute inset-x-0 bottom-0 px-4 pb-6" style={{ zIndex: 3 }}>
-          <div className="mb-2">
-            <span className="text-white px-2 py-0.5 text-[9px] font-extrabold tracking-[0.2em] uppercase" style={{ backgroundColor: '#E8001D' }}>NOW TRENDING</span>
-          </div>
-          <h1 className="text-white font-black uppercase mb-3" style={{ fontSize: 34, letterSpacing: '-0.02em', lineHeight: 1.05 }}>
-            <span style={{ color: '#E8001D' }}>{(hero?.title || "Featured")[0]}</span>{(hero?.title || "Featured").slice(1)}
-          </h1>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                if (hero?.video_id) navigate(`/watch/${hero.video_id}`);
-                else if (hero?.series_id) navigate(`/series/${hero.series_id}`);
-              }}
-              style={{ transform: 'skewX(-8deg)', backgroundColor: '#E8001D', padding: '11px 22px' }}
-            >
-              <span className="flex items-center gap-2 font-extrabold text-xs tracking-[0.1em] uppercase" style={{ transform: 'skewX(8deg)', display: 'block' }}>
-                <Play className="w-3.5 h-3.5 inline" fill="currentColor" /> WATCH NOW
-              </span>
-            </button>
-            <button
-              onClick={() => hero?.video_id && toggleWatchlist(hero.video_id)}
-              style={{ transform: 'skewX(-8deg)', border: '1px solid rgba(255,255,255,0.3)', padding: '11px 22px' }}
-            >
-              <span className="flex items-center gap-2 font-extrabold text-xs tracking-[0.1em] uppercase" style={{ transform: 'skewX(8deg)', display: 'block' }}>
-                {hero?.video_id && watchlist.has(hero.video_id) ? <BookmarkCheck className="w-3.5 h-3.5 inline" /> : <BookmarkPlus className="w-3.5 h-3.5 inline" />} LIST
-              </span>
-            </button>
-          </div>
-        </div>
+        {(() => {
+          const heroIsComingSoon = !!(hero?.release_date && new Date(hero.release_date) > new Date());
+          const heroReleaseLabel = heroIsComingSoon && hero?.release_date
+            ? new Date(hero.release_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+            : null;
+          return (
+            <div className="absolute inset-x-0 bottom-0 px-4 pb-6" style={{ zIndex: 3 }}>
+              <div className="mb-2">
+                <span className="text-white px-2 py-0.5 text-[9px] font-extrabold tracking-[0.2em] uppercase" style={{ backgroundColor: heroIsComingSoon ? '#6b21a8' : '#E8001D' }}>
+                  {heroIsComingSoon ? "COMING SOON" : "NOW TRENDING"}
+                </span>
+              </div>
+              <h1 className="text-white font-black uppercase mb-3" style={{ fontSize: 34, letterSpacing: '-0.02em', lineHeight: 1.05 }}>
+                <span style={{ color: '#E8001D' }}>{(hero?.title || "Featured")[0]}</span>{(hero?.title || "Featured").slice(1)}
+              </h1>
+              {heroIsComingSoon && heroReleaseLabel && (
+                <p className="text-white/60 text-xs font-semibold tracking-widest uppercase mb-3">
+                  Available {heroReleaseLabel}
+                </p>
+              )}
+              <div className="flex items-center gap-3">
+                {heroIsComingSoon ? (
+                  <div
+                    style={{ transform: 'skewX(-8deg)', backgroundColor: 'rgba(255,255,255,0.12)', padding: '11px 22px', cursor: 'not-allowed' }}
+                  >
+                    <span className="flex items-center gap-2 font-extrabold text-xs tracking-[0.1em] uppercase text-white/50" style={{ transform: 'skewX(8deg)', display: 'block' }}>
+                      COMING SOON
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (hero?.video_id) navigate(`/watch/${hero.video_id}`);
+                      else if (hero?.series_id) navigate(`/series/${hero.series_id}`);
+                    }}
+                    style={{ transform: 'skewX(-8deg)', backgroundColor: '#E8001D', padding: '11px 22px' }}
+                  >
+                    <span className="flex items-center gap-2 font-extrabold text-xs tracking-[0.1em] uppercase" style={{ transform: 'skewX(8deg)', display: 'block' }}>
+                      <Play className="w-3.5 h-3.5 inline" fill="currentColor" /> WATCH NOW
+                    </span>
+                  </button>
+                )}
+                <button
+                  onClick={() => hero?.video_id && toggleWatchlist(hero.video_id)}
+                  style={{ transform: 'skewX(-8deg)', border: '1px solid rgba(255,255,255,0.3)', padding: '11px 22px' }}
+                >
+                  <span className="flex items-center gap-2 font-extrabold text-xs tracking-[0.1em] uppercase" style={{ transform: 'skewX(8deg)', display: 'block' }}>
+                    {hero?.video_id && watchlist.has(hero.video_id) ? <BookmarkCheck className="w-3.5 h-3.5 inline" /> : <BookmarkPlus className="w-3.5 h-3.5 inline" />} LIST
+                  </span>
+                </button>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Sound toggle — only when trailer is playing */}
         {trailerActive && currentTrailer && (
