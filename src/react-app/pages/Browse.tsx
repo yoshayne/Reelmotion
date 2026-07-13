@@ -94,18 +94,46 @@ export default function Browse() {
     return () => { if (trailerTimerRef.current) clearTimeout(trailerTimerRef.current); };
   }, [heroIndex, currentTrailer]);
 
-  // When trailer becomes active, restore saved mute preference and play
+  // When trailer becomes active, load HLS stream and restore mute preference
   useEffect(() => {
-    if (!videoRef.current || !trailerActive) return;
+    const video = videoRef.current;
+    if (!video || !trailerActive || !currentTrailer) return;
+
     const savedMuted = localStorage.getItem("hero_muted") !== "false";
     setMuted(savedMuted);
-    videoRef.current.muted = true;
-    videoRef.current.play().then(() => {
-      if (!savedMuted && videoRef.current) {
-        videoRef.current.muted = false;
-      }
-    }).catch(() => {});
-  }, [trailerActive]);
+    video.muted = true; // always start muted for autoplay policy
+
+    const hlsSrc = `https://stream.mux.com/${currentTrailer}.m3u8`;
+
+    const playAndMaybUnmute = () => {
+      video.play().then(() => {
+        if (!savedMuted) video.muted = false;
+      }).catch(() => {});
+    };
+
+    // Safari supports HLS natively; other browsers need hls.js
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = hlsSrc;
+      video.addEventListener("loadedmetadata", playAndMaybUnmute, { once: true });
+    } else {
+      import("hls.js").then(({ default: Hls }) => {
+        if (!Hls.isSupported()) return;
+        const hls = new Hls({ autoStartLoad: true, startLevel: -1 });
+        hls.loadSource(hlsSrc);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, playAndMaybUnmute);
+        // Cleanup stored on the element so it survives effect teardown
+        (video as HTMLVideoElement & { _hls?: typeof hls })._hls = hls;
+      });
+    }
+
+    return () => {
+      const v = video as HTMLVideoElement & { _hls?: { destroy: () => void } };
+      v._hls?.destroy();
+      delete v._hls;
+      video.src = "";
+    };
+  }, [trailerActive, currentTrailer]);
 
   const toggleMute = useCallback(() => {
     if (!videoRef.current) return;
@@ -296,8 +324,6 @@ export default function Browse() {
         {currentTrailer && (
           <video
             ref={videoRef}
-            key={currentTrailer}
-            src={`https://stream.mux.com/${currentTrailer}/low.mp4`}
             className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
             style={{ zIndex: 0, opacity: trailerActive ? 1 : 0 }}
             loop

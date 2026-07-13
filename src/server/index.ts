@@ -18,17 +18,19 @@ import { containsBlockedContent } from "./commentFilter.js";
 import { clerkAuth, adminAuth, clerk } from "./auth.js";
 
 // Rewrite private storage URLs → /api/images/:key proxy so browser can load them.
-// Covers full S3 URLs stored directly in the DB from older uploads.
+// Matches any S3-style URL: https://host/bucket/key → /api/images/key
 const STORAGE_URL_PATTERN = /^https?:\/\/[^/]+\/[^/]+\/(.+)$/;
+const KNOWN_PUBLIC_HOSTS = ["image.mux.com", "stream.mux.com", "cdn.", "cloudinary.com", "imagekit.io"];
+
 function proxyImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
-  if (url.startsWith("/api/images/") || url.startsWith("http") === false) return url;
-  // If it looks like a storage provider URL, extract the key and proxy it
-  const endpoint = process.env.AWS_ENDPOINT_URL_S3 || process.env.S3_ENDPOINT || "t3.storageapi.dev";
-  if (url.includes(endpoint)) {
-    const match = url.match(STORAGE_URL_PATTERN);
-    if (match) return `/api/images/${encodeURIComponent(match[1])}`;
-  }
+  if (!url.startsWith("http")) return url; // already a relative path
+  if (url.startsWith("/api/images/")) return url;
+  // Don't proxy known public CDNs
+  if (KNOWN_PUBLIC_HOSTS.some(h => url.includes(h))) return url;
+  // Any other http URL — assume it's a private S3 bucket URL, extract key and proxy
+  const match = url.match(STORAGE_URL_PATTERN);
+  if (match) return `/api/images/${encodeURIComponent(match[1])}`;
   return url;
 }
 
