@@ -131,10 +131,10 @@ export default function SeriesPage() {
                   const canWatch = userHasAccess || ep.is_free;
                   const isFutureEp = !!(ep.release_date && new Date(ep.release_date) > new Date());
                   const epImage = getThumbnailUrl(
-                    ep.hero_image_url || ep.thumbnail_url || ep.carousel_image_url || imageUrl,
+                    ep.hero_image_url || ep.thumbnail_url || ep.carousel_image_url || null,
                     ep.mux_playback_id,
                     ep.mux_duration
-                  );
+                  ) || imageUrl;
                   const episodeIsNew = isNew(ep.created_at);
                   return (
                     <div
