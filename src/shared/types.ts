@@ -184,6 +184,7 @@ export interface SubscriptionAttempt {
 
 export interface BrowseData {
   videos: Video[];
+  coming_soon: Video[];
   series: Series[];
   categories: Category[];
   carousel: CarouselItem[];

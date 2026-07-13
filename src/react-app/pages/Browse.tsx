@@ -544,6 +544,35 @@ export default function Browse() {
           </div>
         )}
 
+        {/* Coming Soon section */}
+        {(activeTab === "all" || activeTab === "new") && (browseData?.coming_soon?.length ?? 0) > 0 && (
+          <div className="mt-7 mb-2">
+            <SectionHead eyebrow="COMING UP" title="Coming Soon" />
+            <ScrollRow>
+              {(browseData!.coming_soon as Video[]).map((v: Video) => {
+                const releaseLabel = v.release_date
+                  ? new Date(v.release_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                  : null;
+                return (
+                  <PosterCard
+                    key={v.id}
+                    image={v.thumbnail_url}
+                    muxPlaybackId={v.mux_playback_id}
+                    muxDuration={v.mux_duration}
+                    title={v.title}
+                    onClick={() => {}}
+                    badge={
+                      <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest text-white" style={{ backgroundColor: '#6b21a8' }}>
+                        {releaseLabel ? releaseLabel.toUpperCase() : "COMING SOON"}
+                      </span>
+                    }
+                  />
+                );
+              })}
+            </ScrollRow>
+          </div>
+        )}
+
         {/* Movies section */}
         {(activeTab === "all" || activeTab === "movies") && movies.length > 0 && (
           <div className="mt-7 mb-2">

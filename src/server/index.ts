@@ -464,7 +464,7 @@ app.get("/api/browse-data", async (c) => {
   try {
     // Static data (categories+videos, series, carousel) cached 5 minutes
     const staticData = await getCached("browse-data", 300, async () => {
-      const [videos, series, categories, carousel] = await Promise.all([
+      const [videos, comingSoon, series, categories, carousel] = await Promise.all([
         query(
           `SELECT v.*, s.title as series_title
            FROM videos v
@@ -472,6 +472,14 @@ app.get("/api/browse-data", async (c) => {
            WHERE v.is_published = true
              AND (v.release_date IS NULL OR v.release_date <= CURRENT_DATE)
            ORDER BY v.release_date DESC NULLS LAST, v.created_at DESC`
+        ),
+        query(
+          `SELECT v.*, s.title as series_title
+           FROM videos v
+           LEFT JOIN series s ON v.series_id = s.id
+           WHERE v.is_published = true
+             AND v.release_date > CURRENT_DATE
+           ORDER BY v.release_date ASC`
         ),
         query(`SELECT * FROM series ORDER BY created_at DESC`),
         query(`SELECT id, name, slug FROM categories ORDER BY sort_order ASC, name ASC`)
@@ -494,6 +502,7 @@ app.get("/api/browse-data", async (c) => {
 
       return {
         videos: allVideos.map(v => proxyImages(v as Record<string, unknown>, IMAGE_FIELDS_VIDEO)),
+        coming_soon: (comingSoon.rows as Record<string, unknown>[]).map(v => proxyImages(v, IMAGE_FIELDS_VIDEO)),
         categories: categoriesWithVideos,
         series: (series.rows as Record<string, unknown>[]).map(s => proxyImages(s, IMAGE_FIELDS_SERIES)),
         carousel: (carousel.rows as Record<string, unknown>[]).map(c => proxyImages(c, IMAGE_FIELDS_CAROUSEL)),
