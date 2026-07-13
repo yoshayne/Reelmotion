@@ -1104,11 +1104,12 @@ app.get("/api/admin/carousel", clerkAuth, adminAuth, async (c) => {
 app.post("/api/admin/carousel", clerkAuth, adminAuth, async (c) => {
   const body = await c.req.json<Record<string, unknown>>();
   const result = await query(
-    `INSERT INTO carousel_items (title, description, image_url, display_order, is_active, video_id, series_id, release_date)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+    `INSERT INTO carousel_items (title, description, image_url, display_order, is_active, video_id, series_id, release_date, trailer_mux_playback_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
     [
       body.title, body.description, body.image_url, body.display_order ?? 0,
       body.is_active ?? true, body.video_id, body.series_id, body.release_date,
+      body.trailer_mux_playback_id ?? null,
     ]
   );
   await invalidateCache("browse-data");
@@ -1120,11 +1121,13 @@ app.put("/api/admin/carousel/:id", clerkAuth, adminAuth, async (c) => {
   const body = await c.req.json<Record<string, unknown>>();
   const result = await query(
     `UPDATE carousel_items SET title=$1, description=$2, image_url=$3, display_order=$4,
-      is_active=$5, video_id=$6, series_id=$7, release_date=$8, updated_at=NOW()
-     WHERE id=$9 RETURNING *`,
+      is_active=$5, video_id=$6, series_id=$7, release_date=$8,
+      trailer_mux_playback_id=$9, updated_at=NOW()
+     WHERE id=$10 RETURNING *`,
     [
       body.title, body.description, body.image_url, body.display_order,
-      body.is_active, body.video_id, body.series_id, body.release_date, id,
+      body.is_active, body.video_id, body.series_id, body.release_date,
+      body.trailer_mux_playback_id ?? null, id,
     ]
   );
   await invalidateCache("browse-data");
