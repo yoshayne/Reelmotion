@@ -1302,6 +1302,123 @@ app.delete("/api/admin/promo-popups/:id", clerkAuth, adminAuth, async (c) => {
   return c.json({ success: true });
 });
 
+// ─── Analytics ───────────────────────────────────────────────────────────────
+
+app.get("/api/admin/analytics/kpis", clerkAuth, adminAuth, async (c) => {
+  const MONTHLY_PRICE = 4.99;
+  const YEARLY_PRICE = 24.99;
+
+  const [subStats, watchStats, contentStats, signupStats, churnStats] = await Promise.all([
+    query<{ total: string; active: string; monthly_count: string; yearly_count: string; new_this_month: string }>(`
+      SELECT
+        COUNT(*)::text AS total,
+        COUNT(*) FILTER (WHERE status = 'active')::text AS active,
+        COUNT(*) FILTER (WHERE status = 'active' AND plan = 'monthly')::text AS monthly_count,
+        COUNT(*) FILTER (WHERE status = 'active' AND plan = 'yearly')::text AS yearly_count,
+        COUNT(*) FILTER (WHERE status = 'active' AND created_at >= date_trunc('month', NOW()))::text AS new_this_month
+      FROM subscriptions
+    `),
+    query<{ total_seconds: string; avg_seconds: string }>(`
+      SELECT
+        COALESCE(SUM(last_position_seconds), 0)::text AS total_seconds,
+        COALESCE(AVG(last_position_seconds), 0)::text AS avg_seconds
+      FROM playback_history
+    `),
+    query<{ videos: string; series: string }>(`
+      SELECT
+        (SELECT COUNT(*)::text FROM videos WHERE is_published = true) AS videos,
+        (SELECT COUNT(*)::text FROM series) AS series
+    `),
+    query<{ count: string }>(`
+      SELECT COUNT(*)::text AS count FROM users
+      WHERE created_at >= date_trunc('month', NOW())
+    `),
+    query<{ churned: string }>(`
+      SELECT COUNT(*)::text AS churned FROM subscriptions
+      WHERE status = 'canceled'
+      AND updated_at >= date_trunc('month', NOW())
+    `),
+  ]);
+
+  const activeMonthly = Number(subStats.rows[0].monthly_count);
+  const activeYearly = Number(subStats.rows[0].yearly_count);
+  const mrr = activeMonthly * MONTHLY_PRICE + (activeYearly * YEARLY_PRICE) / 12;
+  const arr = mrr * 12;
+  const totalWatchHours = Number(watchStats.rows[0].total_seconds) / 3600;
+  const avgWatchMinutes = Number(watchStats.rows[0].avg_seconds) / 60;
+  const activeSubs = Number(subStats.rows[0].active);
+  const churnedThisMonth = Number(churnStats.rows[0].churned);
+  const churnRate = activeSubs + churnedThisMonth > 0
+    ? (churnedThisMonth / (activeSubs + churnedThisMonth)) * 100
+    : 0;
+
+  return c.json({
+    totalSubscribers: Number(subStats.rows[0].total),
+    activeSubscribers: activeSubs,
+    newSubscribersThisMonth: Number(subStats.rows[0].new_this_month),
+    newSignupsThisMonth: Number(signupStats.rows[0].count),
+    mrr: Math.round(mrr * 100) / 100,
+    arr: Math.round(arr * 100) / 100,
+    totalWatchHours: Math.round(totalWatchHours * 10) / 10,
+    avgWatchMinutes: Math.round(avgWatchMinutes * 10) / 10,
+    totalVideos: Number(contentStats.rows[0].videos),
+    totalSeries: Number(contentStats.rows[0].series),
+    churnRate: Math.round(churnRate * 10) / 10,
+  });
+});
+
+app.get("/api/admin/analytics/charts", clerkAuth, adminAuth, async (c) => {
+  const MONTHLY_PRICE = 4.99;
+  const YEARLY_PRICE = 24.99;
+
+  const [subGrowth, signups, watchHours] = await Promise.all([
+    query<{ day: string; new_monthly: string; new_yearly: string }>(`
+      SELECT
+        TO_CHAR(created_at::date, 'YYYY-MM-DD') AS day,
+        COUNT(*) FILTER (WHERE plan = 'monthly')::text AS new_monthly,
+        COUNT(*) FILTER (WHERE plan = 'yearly')::text AS new_yearly
+      FROM subscriptions
+      WHERE created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY day ORDER BY day
+    `),
+    query<{ day: string; count: string }>(`
+      SELECT
+        TO_CHAR(created_at::date, 'YYYY-MM-DD') AS day,
+        COUNT(*)::text AS count
+      FROM users
+      WHERE created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY day ORDER BY day
+    `),
+    query<{ day: string; hours: string }>(`
+      SELECT
+        TO_CHAR(last_watched_at::date, 'YYYY-MM-DD') AS day,
+        ROUND(SUM(last_position_seconds) / 3600.0, 2)::text AS hours
+      FROM playback_history
+      WHERE last_watched_at >= NOW() - INTERVAL '30 days'
+      GROUP BY day ORDER BY day
+    `),
+  ]);
+
+  const subscriberChart = subGrowth.rows.map(r => ({
+    date: r.day,
+    monthly: Number(r.new_monthly),
+    yearly: Number(r.new_yearly),
+    revenue: Number(r.new_monthly) * MONTHLY_PRICE + Number(r.new_yearly) * YEARLY_PRICE,
+  }));
+
+  const signupsChart = signups.rows.map(r => ({
+    date: r.day,
+    signups: Number(r.count),
+  }));
+
+  const watchChart = watchHours.rows.map(r => ({
+    date: r.day,
+    hours: Number(r.hours),
+  }));
+
+  return c.json({ subscriberChart, signupsChart, watchChart });
+});
+
 // ─── Comments ────────────────────────────────────────────────────────────────
 
 // GET /api/videos/:id/comments — public, returns array directly
