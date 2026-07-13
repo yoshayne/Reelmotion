@@ -578,7 +578,7 @@ app.get("/api/public/cover-art", async (c) => {
 });
 
 app.get("/api/promo-popup", async (c) => {
-  const data = await getCached("promo-popup", 60, async () => {
+  const data = await getCached("promo-popup", 3300, async () => {
     const result = await query(
       `SELECT * FROM promo_popups
        WHERE is_active = true
@@ -588,10 +588,9 @@ app.get("/api/promo-popup", async (c) => {
     );
     const row = result.rows[0];
     if (!row) return null;
-    // Pre-resolve the image URL so the browser can fetch it in one hop
     if (row.image_key) {
       try {
-        row.image_url = getPublicUrl(row.image_key);
+        row.image_url = await getSignedDownloadUrl(row.image_key, 3600);
       } catch {
         row.image_url = null;
       }
