@@ -16,6 +16,32 @@ import { Webhook } from "svix";
 import { query, pool } from "./db.js";
 import { containsBlockedContent } from "./commentFilter.js";
 import { clerkAuth, adminAuth, clerk } from "./auth.js";
+
+// Rewrite private storage URLs → /api/images/:key proxy so browser can load them.
+// Covers full S3 URLs stored directly in the DB from older uploads.
+const STORAGE_URL_PATTERN = /^https?:\/\/[^/]+\/[^/]+\/(.+)$/;
+function proxyImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith("/api/images/") || url.startsWith("http") === false) return url;
+  // If it looks like a storage provider URL, extract the key and proxy it
+  const endpoint = process.env.AWS_ENDPOINT_URL_S3 || process.env.S3_ENDPOINT || "t3.storageapi.dev";
+  if (url.includes(endpoint)) {
+    const match = url.match(STORAGE_URL_PATTERN);
+    if (match) return `/api/images/${encodeURIComponent(match[1])}`;
+  }
+  return url;
+}
+
+// Apply proxyImageUrl to all image fields on a plain object
+function proxyImages<T extends Record<string, unknown>>(row: T, fields: string[]): T {
+  const out = { ...row };
+  for (const f of fields) {
+    if (typeof out[f] === "string" || out[f] == null) {
+      (out as Record<string, unknown>)[f] = proxyImageUrl(out[f] as string | null);
+    }
+  }
+  return out;
+}
 import * as email from "./email.js";
 import Stripe from "stripe";
 import { stripe, createCheckoutSession, createPortalSession } from "./stripe.js";
@@ -459,11 +485,15 @@ app.get("/api/browse-data", async (c) => {
         videos: allVideos.filter(v => v.category_id === cat.id).map(formatVideoForBrowse),
       }));
 
+      const IMAGE_FIELDS_VIDEO = ["thumbnail_url", "hero_image_url", "carousel_image_url"];
+      const IMAGE_FIELDS_SERIES = ["cover_image_url", "carousel_image_url", "hero_image_url"];
+      const IMAGE_FIELDS_CAROUSEL = ["image_url"];
+
       return {
-        videos: allVideos,
+        videos: allVideos.map(v => proxyImages(v as Record<string, unknown>, IMAGE_FIELDS_VIDEO)),
         categories: categoriesWithVideos,
-        series: series.rows,
-        carousel: carousel.rows,
+        series: (series.rows as Record<string, unknown>[]).map(s => proxyImages(s, IMAGE_FIELDS_SERIES)),
+        carousel: (carousel.rows as Record<string, unknown>[]).map(c => proxyImages(c, IMAGE_FIELDS_CAROUSEL)),
       };
     });
 
@@ -515,7 +545,7 @@ app.get("/api/series/:id", async (c) => {
     [isSlug ? id : Number(id)]
   );
   if (!result.rows.length) return c.json({ error: "Not found" }, 404);
-  return c.json(result.rows[0]);
+  return c.json(proxyImages(result.rows[0] as Record<string, unknown>, ["cover_image_url", "carousel_image_url", "hero_image_url"]));
 });
 
 app.get("/api/series/:id/episodes", async (c) => {
@@ -534,7 +564,7 @@ app.get("/api/series/:id/episodes", async (c) => {
      ORDER BY season_number ASC NULLS LAST, episode_number ASC NULLS LAST`,
     [seriesId]
   );
-  return c.json(result.rows);
+  return c.json((result.rows as Record<string, unknown>[]).map(v => proxyImages(v, ["thumbnail_url", "hero_image_url", "carousel_image_url"])));
 });
 
 app.get("/api/watch/:id", async (c) => {
