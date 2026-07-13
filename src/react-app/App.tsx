@@ -38,6 +38,7 @@ import CommunityGuidelines from "@/react-app/pages/CommunityGuidelines";
 import AdminComments from "@/react-app/pages/admin/AdminComments";
 import AdminContentAnalytics from "@/react-app/pages/admin/AdminContentAnalytics";
 import AdminAcquisitionAnalytics from "@/react-app/pages/admin/AdminAcquisitionAnalytics";
+import AdminRoyalties from "@/react-app/pages/admin/AdminRoyalties";
 import ActivateTVPage from "@/react-app/pages/ActivateTV";
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -103,6 +104,7 @@ export default function App() {
           <Route path="/admin/comments" element={<AdminComments />} />
           <Route path="/admin/analytics/content" element={<AdminContentAnalytics />} />
           <Route path="/admin/analytics/acquisition" element={<AdminAcquisitionAnalytics />} />
+          <Route path="/admin/royalties" element={<AdminRoyalties />} />
           <Route path="/activate" element={<ActivateTVPage />} />
         </Routes>
         </Layout>

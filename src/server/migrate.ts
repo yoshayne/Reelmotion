@@ -311,5 +311,53 @@ export async function runMigrations() {
   await query(`CREATE INDEX IF NOT EXISTS idx_device_codes_code ON device_activation_codes(code)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_device_codes_status ON device_activation_codes(status)`);
 
+  // Royalty engine tables
+  await query(`
+    CREATE TABLE IF NOT EXISTS rights_holders (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT,
+      payment_method TEXT,
+      payment_details TEXT,
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS video_rights (
+      id SERIAL PRIMARY KEY,
+      video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+      rights_holder_id INTEGER NOT NULL REFERENCES rights_holders(id) ON DELETE CASCADE,
+      royalty_percent REAL NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(video_id, rights_holder_id)
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS royalty_statements (
+      id SERIAL PRIMARY KEY,
+      period TEXT NOT NULL,
+      rights_holder_id INTEGER NOT NULL REFERENCES rights_holders(id) ON DELETE CASCADE,
+      video_id INTEGER REFERENCES videos(id) ON DELETE SET NULL,
+      video_title TEXT NOT NULL,
+      watch_hours REAL NOT NULL DEFAULT 0,
+      watch_share_percent REAL NOT NULL DEFAULT 0,
+      revenue_pool REAL NOT NULL DEFAULT 0,
+      gross_amount REAL NOT NULL DEFAULT 0,
+      royalty_percent REAL NOT NULL DEFAULT 0,
+      net_amount REAL NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending',
+      paid_at TIMESTAMPTZ,
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_royalty_statements_period ON royalty_statements(period)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_royalty_statements_holder ON royalty_statements(rights_holder_id)`);
+
   console.log("DB migrations complete.");
 }

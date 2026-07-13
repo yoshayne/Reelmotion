@@ -1616,6 +1616,280 @@ app.get("/api/admin/analytics/acquisition", clerkAuth, adminAuth, async (c) => {
   });
 });
 
+// ─── Royalty Engine ──────────────────────────────────────────────────────────
+
+const MONTHLY_PLAN_PRICE = 4.99;
+const YEARLY_PLAN_PRICE = 24.99;
+
+async function computeRevenuePool(): Promise<number> {
+  const result = await query<{ monthly_count: string; yearly_count: string }>(`
+    SELECT
+      COUNT(*) FILTER (WHERE status = 'active' AND plan = 'monthly')::text AS monthly_count,
+      COUNT(*) FILTER (WHERE status = 'active' AND plan = 'yearly')::text AS yearly_count
+    FROM subscriptions
+  `);
+  const m = Number(result.rows[0].monthly_count);
+  const y = Number(result.rows[0].yearly_count);
+  return Math.round((m * MONTHLY_PLAN_PRICE + (y * YEARLY_PLAN_PRICE) / 12) * 100) / 100;
+}
+
+// Rights holders CRUD
+app.get("/api/admin/rights-holders", clerkAuth, adminAuth, async (c) => {
+  const result = await query(`
+    SELECT rh.*,
+      COUNT(DISTINCT vr.video_id)::int AS video_count,
+      COALESCE(SUM(rs.net_amount) FILTER (WHERE rs.status = 'pending'), 0)::real AS pending_amount,
+      COALESCE(SUM(rs.net_amount) FILTER (WHERE rs.status = 'paid'), 0)::real AS paid_amount
+    FROM rights_holders rh
+    LEFT JOIN video_rights vr ON vr.rights_holder_id = rh.id
+    LEFT JOIN royalty_statements rs ON rs.rights_holder_id = rh.id
+    GROUP BY rh.id
+    ORDER BY rh.name
+  `);
+  return c.json(result.rows);
+});
+
+app.post("/api/admin/rights-holders", clerkAuth, adminAuth, async (c) => {
+  const body = await c.req.json<{
+    name: string; email?: string; payment_method?: string;
+    payment_details?: string; notes?: string;
+  }>();
+  const result = await query(
+    `INSERT INTO rights_holders (name, email, payment_method, payment_details, notes)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [body.name, body.email ?? null, body.payment_method ?? null,
+     body.payment_details ?? null, body.notes ?? null]
+  );
+  return c.json(result.rows[0]);
+});
+
+app.put("/api/admin/rights-holders/:id", clerkAuth, adminAuth, async (c) => {
+  const id = Number(c.req.param("id"));
+  const body = await c.req.json<{
+    name: string; email?: string; payment_method?: string;
+    payment_details?: string; notes?: string;
+  }>();
+  const result = await query(
+    `UPDATE rights_holders SET name=$1, email=$2, payment_method=$3,
+     payment_details=$4, notes=$5, updated_at=NOW() WHERE id=$6 RETURNING *`,
+    [body.name, body.email ?? null, body.payment_method ?? null,
+     body.payment_details ?? null, body.notes ?? null, id]
+  );
+  return c.json(result.rows[0]);
+});
+
+app.delete("/api/admin/rights-holders/:id", clerkAuth, adminAuth, async (c) => {
+  const id = Number(c.req.param("id"));
+  await query("DELETE FROM rights_holders WHERE id=$1", [id]);
+  return c.json({ success: true });
+});
+
+// Video rights assignments
+app.get("/api/admin/video-rights", clerkAuth, adminAuth, async (c) => {
+  const result = await query(`
+    SELECT vr.*, v.title AS video_title, v.content_type, v.series_id,
+           s.title AS series_title, rh.name AS rights_holder_name
+    FROM video_rights vr
+    JOIN videos v ON v.id = vr.video_id
+    JOIN rights_holders rh ON rh.id = vr.rights_holder_id
+    LEFT JOIN series s ON s.id = v.series_id
+    ORDER BY v.title, rh.name
+  `);
+  return c.json(result.rows);
+});
+
+app.post("/api/admin/video-rights", clerkAuth, adminAuth, async (c) => {
+  const body = await c.req.json<{ video_id: number; rights_holder_id: number; royalty_percent: number }>();
+  const result = await query(
+    `INSERT INTO video_rights (video_id, rights_holder_id, royalty_percent)
+     VALUES ($1,$2,$3)
+     ON CONFLICT (video_id, rights_holder_id) DO UPDATE SET royalty_percent=$3
+     RETURNING *`,
+    [body.video_id, body.rights_holder_id, body.royalty_percent]
+  );
+  return c.json(result.rows[0]);
+});
+
+app.delete("/api/admin/video-rights/:id", clerkAuth, adminAuth, async (c) => {
+  const id = Number(c.req.param("id"));
+  await query("DELETE FROM video_rights WHERE id=$1", [id]);
+  return c.json({ success: true });
+});
+
+// Royalty overview
+app.get("/api/admin/royalties/overview", clerkAuth, adminAuth, async (c) => {
+  const [pool, statements, watchTotals] = await Promise.all([
+    computeRevenuePool(),
+    query<{ status: string; total: string; count: string }>(`
+      SELECT status, SUM(net_amount)::real AS total, COUNT(*)::text AS count
+      FROM royalty_statements GROUP BY status
+    `),
+    query<{ video_id: string; video_title: string; watch_hours: string }>(`
+      SELECT v.id::text AS video_id, v.title AS video_title,
+             ROUND(SUM(ph.last_position_seconds) / 3600.0, 4)::real AS watch_hours
+      FROM videos v
+      JOIN video_rights vr ON vr.video_id = v.id
+      LEFT JOIN playback_history ph ON ph.video_id = v.id
+      WHERE v.is_published = true
+      GROUP BY v.id, v.title
+      ORDER BY watch_hours DESC
+    `),
+  ]);
+
+  const totalHours = watchTotals.rows.reduce((s, r) => s + Number(r.watch_hours), 0);
+  const pending = statements.rows.find(r => r.status === "pending");
+  const paid = statements.rows.find(r => r.status === "paid");
+
+  const contentBreakdown = watchTotals.rows.map(r => ({
+    videoId: Number(r.video_id),
+    videoTitle: r.video_title,
+    watchHours: Number(r.watch_hours),
+    watchSharePercent: totalHours > 0 ? Math.round((Number(r.watch_hours) / totalHours) * 1000) / 10 : 0,
+    estimatedRevenue: totalHours > 0
+      ? Math.round((Number(r.watch_hours) / totalHours) * pool * 100) / 100
+      : 0,
+  }));
+
+  return c.json({
+    revenuePool: pool,
+    totalWatchHours: Math.round(totalHours * 10) / 10,
+    pendingStatements: Number(pending?.count ?? 0),
+    pendingAmount: Math.round((Number(pending?.total ?? 0)) * 100) / 100,
+    paidStatements: Number(paid?.count ?? 0),
+    paidAmount: Math.round((Number(paid?.total ?? 0)) * 100) / 100,
+    contentBreakdown,
+  });
+});
+
+// Generate royalty statements for current period
+app.post("/api/admin/royalties/calculate", clerkAuth, adminAuth, async (c) => {
+  const body = await c.req.json<{ period?: string }>().catch(() => ({}));
+  const now = new Date();
+  const period = (body as { period?: string }).period ??
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  // Check if statements already exist for this period
+  const existing = await query(
+    "SELECT COUNT(*) AS count FROM royalty_statements WHERE period=$1", [period]
+  );
+  if (Number((existing.rows[0] as { count: string }).count) > 0) {
+    return c.json({ error: `Statements for ${period} already exist` }, 409);
+  }
+
+  const pool = await computeRevenuePool();
+
+  // Get all videos with rights assignments + their watch hours
+  const rights = await query<{
+    video_id: string; video_title: string; rights_holder_id: string;
+    royalty_percent: string; watch_hours: string;
+  }>(`
+    SELECT
+      v.id::text AS video_id, v.title AS video_title,
+      vr.rights_holder_id::text, vr.royalty_percent::text,
+      COALESCE(ROUND(SUM(ph.last_position_seconds) / 3600.0, 4), 0)::text AS watch_hours
+    FROM video_rights vr
+    JOIN videos v ON v.id = vr.video_id
+    LEFT JOIN playback_history ph ON ph.video_id = v.id
+    WHERE v.is_published = true
+    GROUP BY v.id, v.title, vr.rights_holder_id, vr.royalty_percent
+  `);
+
+  // Total watch hours across all rights-assigned content
+  const totalHours = rights.rows.reduce((s, r) => s + Number(r.watch_hours), 0);
+
+  if (rights.rows.length === 0 || totalHours === 0) {
+    return c.json({ error: "No rights-assigned content with watch data found" }, 400);
+  }
+
+  const inserted: unknown[] = [];
+  for (const r of rights.rows) {
+    const watchHours = Number(r.watch_hours);
+    const sharePercent = Math.round((watchHours / totalHours) * 1000) / 10;
+    const grossAmount = Math.round((watchHours / totalHours) * pool * 100) / 100;
+    const royaltyPercent = Number(r.royalty_percent);
+    const netAmount = Math.round(grossAmount * (royaltyPercent / 100) * 100) / 100;
+
+    const stmt = await query(
+      `INSERT INTO royalty_statements
+       (period, rights_holder_id, video_id, video_title, watch_hours, watch_share_percent,
+        revenue_pool, gross_amount, royalty_percent, net_amount, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending') RETURNING *`,
+      [period, r.rights_holder_id, r.video_id, r.video_title, watchHours,
+       sharePercent, pool, grossAmount, royaltyPercent, netAmount]
+    );
+    inserted.push(stmt.rows[0]);
+  }
+
+  return c.json({ period, generated: inserted.length, statements: inserted });
+});
+
+// List statements
+app.get("/api/admin/royalties/statements", clerkAuth, adminAuth, async (c) => {
+  const period = c.req.query("period");
+  const holderId = c.req.query("rights_holder_id");
+
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  if (period) { conditions.push(`rs.period=$${params.length + 1}`); params.push(period); }
+  if (holderId) { conditions.push(`rs.rights_holder_id=$${params.length + 1}`); params.push(Number(holderId)); }
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const result = await query(`
+    SELECT rs.*, rh.name AS rights_holder_name, rh.email AS rights_holder_email,
+           rh.payment_method, rh.payment_details
+    FROM royalty_statements rs
+    JOIN rights_holders rh ON rh.id = rs.rights_holder_id
+    ${where}
+    ORDER BY rs.period DESC, rh.name, rs.video_title
+  `, params);
+
+  return c.json(result.rows);
+});
+
+// Get available statement periods
+app.get("/api/admin/royalties/periods", clerkAuth, adminAuth, async (c) => {
+  const result = await query(`
+    SELECT DISTINCT period, SUM(net_amount)::real AS total_owed,
+           COUNT(*) FILTER (WHERE status='pending')::int AS pending_count,
+           COUNT(*) FILTER (WHERE status='paid')::int AS paid_count
+    FROM royalty_statements
+    GROUP BY period ORDER BY period DESC
+  `);
+  return c.json(result.rows);
+});
+
+// Mark statement(s) paid
+app.put("/api/admin/royalties/statements/:id/pay", clerkAuth, adminAuth, async (c) => {
+  const id = Number(c.req.param("id"));
+  const body = await c.req.json<{ notes?: string }>().catch(() => ({}));
+  const result = await query(
+    `UPDATE royalty_statements SET status='paid', paid_at=NOW(),
+     notes=COALESCE($2, notes), updated_at=NOW() WHERE id=$1 RETURNING *`,
+    [id, (body as { notes?: string }).notes ?? null]
+  );
+  return c.json(result.rows[0]);
+});
+
+// Mark all pending statements for a period paid
+app.put("/api/admin/royalties/periods/:period/pay-all", clerkAuth, adminAuth, async (c) => {
+  const period = c.req.param("period");
+  const result = await query(
+    `UPDATE royalty_statements SET status='paid', paid_at=NOW(), updated_at=NOW()
+     WHERE period=$1 AND status='pending' RETURNING id`,
+    [period]
+  );
+  return c.json({ paid: result.rows.length });
+});
+
+// Delete statements for a period (to recalculate)
+app.delete("/api/admin/royalties/periods/:period", clerkAuth, adminAuth, async (c) => {
+  const period = c.req.param("period");
+  await query(
+    "DELETE FROM royalty_statements WHERE period=$1 AND status='pending'", [period]
+  );
+  return c.json({ success: true });
+});
+
 // ─── Comments ────────────────────────────────────────────────────────────────
 
 // GET /api/videos/:id/comments — public, returns array directly
