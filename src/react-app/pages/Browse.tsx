@@ -223,7 +223,7 @@ export default function Browse() {
   function ScrollRow({ children }: { children: React.ReactNode }) {
     return (
       <div className="overflow-x-auto scrollbar-hide">
-        <div className="flex gap-3 px-4" style={{ paddingRight: 16 }}>
+        <div className="flex flex-nowrap gap-3 px-4" style={{ paddingRight: 16 }}>
           {children}
         </div>
       </div>
