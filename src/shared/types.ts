@@ -86,6 +86,7 @@ export interface CarouselItem {
   video_id: number | null;
   series_id: number | null;
   release_date: string | null;
+  trailer_mux_playback_id: string | null;
   created_at: string;
   updated_at: string;
 }

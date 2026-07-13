@@ -14,7 +14,7 @@ export default function AdminCarouselForm() {
   const isNew = !id || id === "new";
   const [form, setForm] = useState<CarouselFormData>({
     title: "", description: "", image_url: "", display_order: 0, is_active: true,
-    video_id: null, series_id: null,
+    video_id: null, series_id: null, trailer_mux_playback_id: null,
   });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -205,6 +205,21 @@ export default function AdminCarouselForm() {
               <input name="release_date" type="date" value={form.release_date ?? ""} onChange={handleChange}
                 className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-600" />
             </div>
+          </div>
+
+          {/* Trailer */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-1.5">Trailer / Preview (Mux Playback ID)</label>
+            <input
+              name="trailer_mux_playback_id"
+              value={form.trailer_mux_playback_id ?? ""}
+              onChange={e => setForm(p => ({ ...p, trailer_mux_playback_id: e.target.value || null }))}
+              placeholder="e.g. abc123xyz — paste from Mux dashboard"
+              className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-600"
+            />
+            <p className="text-xs text-gray-600 mt-1.5">
+              If set, the hero will autoplay this trailer muted after 3 seconds. Users can unmute with the sound button.
+            </p>
           </div>
 
           <label className="flex items-center gap-2.5 cursor-pointer">

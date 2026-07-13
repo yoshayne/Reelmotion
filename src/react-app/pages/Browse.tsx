@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { useUser } from "@clerk/clerk-react";
-import { Play, BookmarkPlus, BookmarkCheck, X } from "lucide-react";
+import { Play, BookmarkPlus, BookmarkCheck, X, Volume2, VolumeX } from "lucide-react";
 import { apiFetch } from "@/react-app/utils/api";
 import { getThumbnailUrl } from "@/react-app/utils/thumbnail";
 import type { BrowseData, Video, Series, CarouselItem, PromoPopup } from "@/shared/types";
@@ -21,6 +21,10 @@ export default function Browse() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [continueWatching, setContinueWatching] = useState<any[]>([]);
   const heroIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [trailerActive, setTrailerActive] = useState(false);
+  const [muted, setMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const trailerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { tagline } = useBrandAssets();
 
   useEffect(() => {
@@ -71,9 +75,45 @@ export default function Browse() {
 
   useEffect(() => {
     if (!browseData?.carousel?.length) return;
+    // Pause rotation while a trailer is actively playing
+    if (trailerActive) {
+      if (heroIntervalRef.current) { clearInterval(heroIntervalRef.current); heroIntervalRef.current = null; }
+      return;
+    }
     heroIntervalRef.current = setInterval(() => setHeroIndex(i => (i + 1) % (browseData.carousel?.length ?? 1)), 5000);
     return () => { if (heroIntervalRef.current) clearInterval(heroIntervalRef.current); };
-  }, [browseData]);
+  }, [browseData, trailerActive]);
+
+  // Trailer autoplay logic — show image for 3s then fade to muted video
+  const currentTrailer = browseData?.carousel?.[heroIndex]?.trailer_mux_playback_id ?? null;
+  useEffect(() => {
+    setTrailerActive(false);
+    if (trailerTimerRef.current) clearTimeout(trailerTimerRef.current);
+    if (!currentTrailer) return;
+    trailerTimerRef.current = setTimeout(() => setTrailerActive(true), 3000);
+    return () => { if (trailerTimerRef.current) clearTimeout(trailerTimerRef.current); };
+  }, [heroIndex, currentTrailer]);
+
+  // When trailer becomes active, restore saved mute preference and play
+  useEffect(() => {
+    if (!videoRef.current || !trailerActive) return;
+    const savedMuted = localStorage.getItem("hero_muted") !== "false";
+    setMuted(savedMuted);
+    videoRef.current.muted = true;
+    videoRef.current.play().then(() => {
+      if (!savedMuted && videoRef.current) {
+        videoRef.current.muted = false;
+      }
+    }).catch(() => {});
+  }, [trailerActive]);
+
+  const toggleMute = useCallback(() => {
+    if (!videoRef.current) return;
+    const next = !videoRef.current.muted;
+    videoRef.current.muted = next;
+    setMuted(next);
+    localStorage.setItem("hero_muted", String(next));
+  }, []);
 
   const toggleWatchlist = async (videoId: number) => {
     const inList = watchlist.has(videoId);
@@ -243,8 +283,27 @@ export default function Browse() {
 
       {/* Hero Section */}
       <div className="relative overflow-hidden" style={{ height: 380, marginTop: 56 }}>
+        {/* Static image — always underneath */}
         {hero?.image_url && (
-          <img src={hero.image_url} alt={hero.title} className="absolute inset-0 w-full h-full object-cover" style={{ zIndex: 0 }} />
+          <img
+            src={hero.image_url}
+            alt={hero.title}
+            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
+            style={{ zIndex: 0, opacity: trailerActive ? 0 : 1 }}
+          />
+        )}
+        {/* Trailer video — fades in over image */}
+        {currentTrailer && (
+          <video
+            ref={videoRef}
+            key={currentTrailer}
+            src={`https://stream.mux.com/${currentTrailer}/low.mp4`}
+            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
+            style={{ zIndex: 0, opacity: trailerActive ? 1 : 0 }}
+            loop
+            playsInline
+            muted
+          />
         )}
         {/* Dark vignette so text is always readable */}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.15) 100%)', zIndex: 1 }} />
@@ -281,6 +340,21 @@ export default function Browse() {
             </button>
           </div>
         </div>
+
+        {/* Sound toggle — only when trailer is playing */}
+        {trailerActive && currentTrailer && (
+          <button
+            onClick={toggleMute}
+            className="absolute top-4 right-4 flex items-center justify-center w-9 h-9 rounded-full border border-white/40 bg-black/40 hover:bg-black/60 transition-colors"
+            style={{ zIndex: 4 }}
+            aria-label={muted ? "Unmute" : "Mute"}
+          >
+            {muted
+              ? <VolumeX className="w-4 h-4 text-white" />
+              : <Volume2 className="w-4 h-4 text-white" />
+            }
+          </button>
+        )}
 
         {/* Carousel dots */}
         {(browseData?.carousel?.length ?? 0) > 1 && (
