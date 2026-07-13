@@ -37,6 +37,7 @@ import SSOCallback from "@/react-app/pages/SSOCallback";
 import CommunityGuidelines from "@/react-app/pages/CommunityGuidelines";
 import AdminComments from "@/react-app/pages/admin/AdminComments";
 import AdminContentAnalytics from "@/react-app/pages/admin/AdminContentAnalytics";
+import AdminAcquisitionAnalytics from "@/react-app/pages/admin/AdminAcquisitionAnalytics";
 import ActivateTVPage from "@/react-app/pages/ActivateTV";
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -101,6 +102,7 @@ export default function App() {
           <Route path="/community-guidelines" element={<CommunityGuidelines />} />
           <Route path="/admin/comments" element={<AdminComments />} />
           <Route path="/admin/analytics/content" element={<AdminContentAnalytics />} />
+          <Route path="/admin/analytics/acquisition" element={<AdminAcquisitionAnalytics />} />
           <Route path="/activate" element={<ActivateTVPage />} />
         </Routes>
         </Layout>

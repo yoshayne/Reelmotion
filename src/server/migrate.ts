@@ -276,6 +276,7 @@ export async function runMigrations() {
     `ALTER TABLE promo_popups ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT false`,
     `ALTER TABLE promo_popups ADD COLUMN IF NOT EXISTS start_date DATE`,
     `ALTER TABLE promo_popups ADD COLUMN IF NOT EXISTS end_date DATE`,
+    `ALTER TABLE playback_history ADD COLUMN IF NOT EXISTS last_watched_at TIMESTAMPTZ DEFAULT NOW()`,
   ];
 
   for (const sql of alterations) {

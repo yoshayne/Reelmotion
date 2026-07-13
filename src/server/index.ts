@@ -826,10 +826,10 @@ app.post("/api/playback-history", clerkAuth, async (c) => {
   }>();
 
   await query(
-    `INSERT INTO playback_history (user_id, video_id, last_position_seconds, completed)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO playback_history (user_id, video_id, last_position_seconds, completed, last_watched_at)
+     VALUES ($1, $2, $3, $4, NOW())
      ON CONFLICT (user_id, video_id) DO UPDATE SET
-       last_position_seconds = $3, completed = $4, updated_at = NOW()`,
+       last_position_seconds = $3, completed = $4, updated_at = NOW(), last_watched_at = NOW()`,
     [user.id, body.video_id, body.last_position_seconds, body.completed ?? false]
   );
 
@@ -1502,6 +1502,117 @@ app.get("/api/admin/analytics/content", clerkAuth, adminAuth, async (c) => {
   return c.json({
     videos: videos.rows.map(toContent),
     series: series.rows.map(toSeriesContent),
+  });
+});
+
+app.get("/api/admin/analytics/acquisition", clerkAuth, adminAuth, async (c) => {
+  // Videos that converted subscribers: watched within 7 days before subscribing
+  const [converters, freeTouch, funnel] = await Promise.all([
+    query<{
+      video_id: string; title: string; slug: string; content_type: string;
+      series_title: string | null; thumbnail_url: string | null;
+      mux_playback_id: string | null; mux_duration: string | null;
+      conversions: string; unique_converters: string;
+    }>(`
+      SELECT
+        v.id::text AS video_id,
+        v.title,
+        v.slug,
+        v.content_type,
+        s.title AS series_title,
+        v.thumbnail_url,
+        v.mux_playback_id,
+        v.mux_duration::text,
+        COUNT(DISTINCT sub.id)::text AS conversions,
+        COUNT(DISTINCT ph.user_id)::text AS unique_converters
+      FROM playback_history ph
+      JOIN subscriptions sub
+        ON sub.user_id = ph.user_id
+        AND ph.last_watched_at >= (sub.created_at - INTERVAL '7 days')
+        AND ph.last_watched_at <= sub.created_at
+      JOIN videos v ON v.id = ph.video_id
+      LEFT JOIN series s ON s.id = v.series_id
+      GROUP BY v.id, v.title, v.slug, v.content_type, s.title, v.thumbnail_url, v.mux_playback_id, v.mux_duration
+      ORDER BY conversions DESC
+      LIMIT 30
+    `),
+    // Free content that gets the most views from non-subscribers (top of funnel)
+    query<{
+      video_id: string; title: string; slug: string; content_type: string;
+      thumbnail_url: string | null; mux_playback_id: string | null; mux_duration: string | null;
+      free_views: string; non_sub_viewers: string;
+    }>(`
+      SELECT
+        v.id::text AS video_id,
+        v.title,
+        v.slug,
+        v.content_type,
+        v.thumbnail_url,
+        v.mux_playback_id,
+        v.mux_duration::text,
+        COUNT(ph.id)::text AS free_views,
+        COUNT(DISTINCT ph.user_id)::text AS non_sub_viewers
+      FROM videos v
+      JOIN playback_history ph ON ph.video_id = v.id
+      LEFT JOIN subscriptions sub
+        ON sub.user_id = ph.user_id AND sub.status = 'active'
+      WHERE v.is_free = true AND v.is_published = true AND sub.id IS NULL
+      GROUP BY v.id, v.title, v.slug, v.content_type, v.thumbnail_url, v.mux_playback_id, v.mux_duration
+      ORDER BY free_views DESC
+      LIMIT 20
+    `),
+    // Subscription funnel: signups → subscription attempts → conversions
+    query<{
+      total_users: string; attempted: string; converted: string; abandoned: string;
+    }>(`
+      SELECT
+        (SELECT COUNT(*)::text FROM users) AS total_users,
+        (SELECT COUNT(DISTINCT user_id)::text FROM subscription_attempts WHERE user_id IS NOT NULL) AS attempted,
+        (SELECT COUNT(*)::text FROM subscriptions WHERE status = 'active') AS converted,
+        (SELECT COUNT(DISTINCT user_id)::text FROM subscription_attempts
+         WHERE status = 'abandoned' AND user_id IS NOT NULL) AS abandoned
+    `),
+  ]);
+
+  const f = funnel.rows[0];
+  const totalUsers = Number(f.total_users);
+  const attempted = Number(f.attempted);
+  const converted = Number(f.converted);
+  const abandoned = Number(f.abandoned);
+
+  return c.json({
+    convertingContent: converters.rows.map(r => ({
+      videoId: Number(r.video_id),
+      title: r.title,
+      slug: r.slug,
+      contentType: r.content_type,
+      seriesTitle: r.series_title,
+      thumbnailUrl: r.thumbnail_url,
+      muxPlaybackId: r.mux_playback_id,
+      muxDuration: r.mux_duration ? Number(r.mux_duration) : null,
+      conversions: Number(r.conversions),
+      uniqueConverters: Number(r.unique_converters),
+    })),
+    topOfFunnel: freeTouch.rows.map(r => ({
+      videoId: Number(r.video_id),
+      title: r.title,
+      slug: r.slug,
+      contentType: r.content_type,
+      thumbnailUrl: r.thumbnail_url,
+      muxPlaybackId: r.mux_playback_id,
+      muxDuration: r.mux_duration ? Number(r.mux_duration) : null,
+      freeViews: Number(r.free_views),
+      nonSubViewers: Number(r.non_sub_viewers),
+    })),
+    funnel: {
+      totalUsers,
+      attempted,
+      converted,
+      abandoned,
+      signupToAttemptRate: totalUsers > 0 ? Math.round((attempted / totalUsers) * 1000) / 10 : 0,
+      attemptToConvertRate: attempted > 0 ? Math.round((converted / attempted) * 1000) / 10 : 0,
+      abandonRate: attempted > 0 ? Math.round((abandoned / attempted) * 1000) / 10 : 0,
+    },
   });
 });
 
