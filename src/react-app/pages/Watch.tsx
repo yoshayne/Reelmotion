@@ -473,7 +473,7 @@ export default function WatchPage() {
         </div>
 
         {/* Comments */}
-        <CommentSection videoId={video.id} isAdmin={false} canComment={canWatch} />
+        <CommentSection videoId={video.id} isAdmin={false} canComment={canWatch || isFutureRelease} />
 
         {/* Footer */}
         <div className="mt-12 flex items-center gap-4">

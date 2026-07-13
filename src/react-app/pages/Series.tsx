@@ -139,10 +139,9 @@ export default function SeriesPage() {
                   return (
                     <div
                       key={ep.id}
-                      onClick={() => !isFutureEp && navigate(`/watch/${ep.id}`)}
-                      className="flex gap-3 p-3 bg-gray-900/50 border border-gray-800 rounded-xl transition-colors group"
+                      onClick={() => navigate(`/watch/${ep.id}`)}
+                      className="flex gap-3 p-3 bg-gray-900/50 border border-gray-800 rounded-xl cursor-pointer hover:border-purple-600/40 transition-colors group"
                       style={{
-                        cursor: isFutureEp ? 'default' : 'pointer',
                         borderColor: isFutureEp ? 'rgba(107,33,168,0.3)' : episodeIsNew ? 'rgba(232,0,29,0.25)' : undefined,
                       }}
                     >
