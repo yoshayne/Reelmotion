@@ -1391,7 +1391,7 @@ app.get("/api/admin/analytics/charts", clerkAuth, adminAuth, async (c) => {
     query<{ day: string; hours: string }>(`
       SELECT
         TO_CHAR(last_watched_at::date, 'YYYY-MM-DD') AS day,
-        ROUND(SUM(last_position_seconds) / 3600.0, 2)::text AS hours
+        ROUND(SUM(last_position_seconds)::numeric / 3600.0, 2)::text AS hours
       FROM playback_history
       WHERE last_watched_at >= NOW() - INTERVAL '30 days'
       GROUP BY day ORDER BY day
@@ -1725,7 +1725,7 @@ app.get("/api/admin/royalties/overview", clerkAuth, adminAuth, async (c) => {
     `),
     query<{ video_id: string; video_title: string; watch_hours: string }>(`
       SELECT v.id::text AS video_id, v.title AS video_title,
-             ROUND(SUM(ph.last_position_seconds) / 3600.0, 4)::real AS watch_hours
+             ROUND(SUM(ph.last_position_seconds)::numeric / 3600.0, 4)::real AS watch_hours
       FROM videos v
       JOIN video_rights vr ON vr.video_id = v.id
       LEFT JOIN playback_history ph ON ph.video_id = v.id
@@ -1785,7 +1785,7 @@ app.post("/api/admin/royalties/calculate", clerkAuth, adminAuth, async (c) => {
     SELECT
       v.id::text AS video_id, v.title AS video_title,
       vr.rights_holder_id::text, vr.royalty_percent::text,
-      COALESCE(ROUND(SUM(ph.last_position_seconds) / 3600.0, 4), 0)::text AS watch_hours
+      COALESCE(ROUND(SUM(ph.last_position_seconds)::numeric / 3600.0, 4), 0)::text AS watch_hours
     FROM video_rights vr
     JOIN videos v ON v.id = vr.video_id
     LEFT JOIN playback_history ph ON ph.video_id = v.id
