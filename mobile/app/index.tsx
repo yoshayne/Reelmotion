@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
 
-// maybeCompleteAuthSession() lives in app/sso-callback.tsx — not here.
+WebBrowser.maybeCompleteAuthSession();
 
 const APP_URL = "https://reelmotionapp.com";
 
@@ -105,7 +105,7 @@ export default function App() {
     addLog("handleNativeSSO START");
 
     try {
-      const redirectUrl = Linking.createURL("/sso-callback");
+      const redirectUrl = Linking.createURL("");
       addLog(`redirectUrl: ${redirectUrl}`);
       addLog(`startSSOFlow exists: ${typeof startSSOFlow}`);
 
