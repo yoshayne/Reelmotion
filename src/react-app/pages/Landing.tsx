@@ -14,13 +14,13 @@ export default function Landing() {
   }, [isSignedIn, navigate]);
 
   const handleGoogleSignIn = () => {
-    // When running inside the native app, message the native layer to handle
-    // Google sign-in via SFSafariViewController (Clerk web OAuth is blocked in WKWebView)
     if ((window as any).__NATIVE_APP__) {
+      // Native app opens this page in SFSafariViewController (real browser).
+      // Tell it which URL to open — the sign-in page configured to redirect
+      // back to /native-signin-complete after OAuth completes.
       (window as any).ReactNativeWebView?.postMessage(
         JSON.stringify({ type: "GOOGLE_SIGN_IN" })
       );
-      // Navigation will happen when the native app fires 'native-session-ready'
       return;
     }
     signIn?.authenticateWithRedirect({
@@ -29,6 +29,10 @@ export default function Landing() {
       redirectUrlComplete: "/browse",
     });
   };
+
+  // Called from the native app via openBrowserAsync after sign-in completes
+  // and the WebView reloads with the Clerk session cookie already set.
+  // isSignedIn will become true and the useEffect above navigates to /browse.
 
   useEffect(() => {
     const onNativeSession = () => navigate("/browse", { replace: true });

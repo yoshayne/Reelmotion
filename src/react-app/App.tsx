@@ -40,6 +40,8 @@ import AdminContentAnalytics from "@/react-app/pages/admin/AdminContentAnalytics
 import AdminAcquisitionAnalytics from "@/react-app/pages/admin/AdminAcquisitionAnalytics";
 import AdminRoyalties from "@/react-app/pages/admin/AdminRoyalties";
 import ActivateTVPage from "@/react-app/pages/ActivateTV";
+import NativeSigninComplete from "@/react-app/pages/NativeSigninComplete";
+import NativeSignin from "@/react-app/pages/NativeSignin";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -100,6 +102,8 @@ export default function App() {
           <Route path="/contest/terms" element={<ContestTerms />} />
           <Route path="/sso-callback" element={<SSOCallback />} />
           <Route path="/auth-callback" element={<SSOCallback />} />
+          <Route path="/native-signin" element={<NativeSignin />} />
+          <Route path="/native-signin-complete" element={<NativeSigninComplete />} />
           <Route path="/community-guidelines" element={<CommunityGuidelines />} />
           <Route path="/admin/comments" element={<AdminComments />} />
           <Route path="/admin/analytics/content" element={<AdminContentAnalytics />} />

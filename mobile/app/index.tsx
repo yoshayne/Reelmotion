@@ -1,4 +1,4 @@
-import { useSSO, useAuth, useUser } from "@clerk/clerk-expo";
+import { useAuth, useUser } from "@clerk/clerk-expo";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
@@ -24,7 +24,6 @@ const INJECTED_JS = `
 const ts = () => new Date().toISOString().slice(11, 23);
 
 export default function App() {
-  const { startSSOFlow } = useSSO();
   const { getToken, isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const webViewRef = useRef<WebView>(null);
@@ -102,48 +101,27 @@ export default function App() {
       return;
     }
     ssoRunning.current = true;
-    addLog("handleNativeSSO START");
+    addLog("handleNativeSSO START — opening SFSafariViewController");
 
     try {
-      const redirectUrl = Linking.createURL("");
-      addLog(`redirectUrl: ${redirectUrl}`);
-      addLog(`startSSOFlow exists: ${typeof startSSOFlow}`);
+      // Open the web sign-in page in SFSafariViewController (a real browser).
+      // Google OAuth works here; Clerk sets its session cookie for reelmotionapp.com.
+      // After sign-in, /native-signin-complete redirects to reelmotion://signin-done
+      // which closes the browser. We then reload the WebView so it picks up the cookie.
+      const result = await WebBrowser.openBrowserAsync(
+        "https://reelmotionapp.com/native-signin",
+        { dismissButtonStyle: "cancel", toolbarColor: "#000000" }
+      );
+      addLog(`Browser closed: type=${result.type}`);
 
-      addLog("Calling startSSOFlow...");
-      const result = await startSSOFlow({ strategy: "oauth_google", redirectUrl });
-
-      addLog(`startSSOFlow returned: createdSessionId=${result.createdSessionId ?? "NONE"}`);
-      addLog(`setActive exists: ${typeof result.setActive}`);
-      addLog(`authSessionResult: ${JSON.stringify(result.authSessionResult ?? {})}`);
-
-      const { createdSessionId, setActive } = result;
-
-      if (!createdSessionId) {
-        addLog("ERROR: no createdSessionId — user may have cancelled");
-        Alert.alert("Cancelled", "No session was created.");
-        return;
-      }
-      if (!setActive) {
-        addLog("ERROR: setActive is undefined");
-        Alert.alert("Error", "setActive not available");
-        return;
-      }
-
-      addLog(`Calling setActive with sessionId=${createdSessionId}`);
-      await setActive({ session: createdSessionId });
-      addLog("setActive DONE");
-
-      injectedRef.current = false;
-      addLog("Calling injectSession post-SSO");
-      await injectSession("post-sso");
+      // Reload the WebView — Clerk session cookie is now set from SFSafariViewController.
+      // Clerk's React hooks will detect the session and redirect to /browse.
+      addLog("Reloading WebView to pick up Clerk session cookie");
+      webViewRef.current?.reload();
 
     } catch (e: any) {
       addLog(`handleNativeSSO ERROR: ${e?.message ?? e}`);
-      addLog(`  code: ${e?.code ?? "none"}`);
-      addLog(`  status: ${e?.status ?? "none"}`);
-      addLog(`  errors: ${JSON.stringify(e?.errors ?? [])}`);
-      addLog(`  full: ${JSON.stringify(e)}`);
-      Alert.alert("Sign-in Error", `${e?.message ?? e}\n\ncode: ${e?.code ?? "?"}`);
+      Alert.alert("Sign-in Error", e?.message ?? String(e));
     } finally {
       ssoRunning.current = false;
       addLog("handleNativeSSO END");
@@ -184,7 +162,7 @@ export default function App() {
         userAgent={CHROME_UA}
         javaScriptEnabled
         domStorageEnabled
-        sharedCookiesEnabled={false}
+        sharedCookiesEnabled={true}
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         allowsFullscreenVideo
