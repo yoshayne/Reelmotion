@@ -117,10 +117,31 @@ export default function App() {
       );
       addLog(`Browser closed: type=${result.type}`);
 
-      // Reload the WebView — Clerk session cookie is now set from SFSafariViewController.
-      // Clerk's React hooks will detect the session and redirect to /browse.
-      addLog("Reloading WebView to pick up Clerk session cookie");
-      webViewRef.current?.reload();
+      if (result.type === "success" && result.url) {
+        addLog(`Redirect URL: ${result.url}`);
+        // Extract token and user info from the deep link URL
+        const parsed = new URL(result.url);
+        const token = parsed.searchParams.get("token");
+        const userRaw = parsed.searchParams.get("user");
+
+        if (token && webViewRef.current) {
+          const userInfo = userRaw ? JSON.parse(decodeURIComponent(userRaw)) : {};
+          addLog(`Injecting token for ${userInfo.email ?? "unknown"}`);
+          webViewRef.current.injectJavaScript(`
+            (function() {
+              window.__NATIVE_APP__ = true;
+              window.__NATIVE_CLERK_TOKEN__ = ${JSON.stringify(token)};
+              window.__NATIVE_USER__ = ${JSON.stringify(userInfo)};
+              window.dispatchEvent(new CustomEvent('native-session-ready', { detail: { user: window.__NATIVE_USER__ } }));
+            })();
+            true;
+          `);
+          injectedRef.current = true;
+        } else {
+          addLog("No token in URL — reloading WebView");
+          webViewRef.current?.reload();
+        }
+      }
 
     } catch (e: any) {
       addLog(`handleNativeSSO ERROR: ${e?.message ?? e}`);
