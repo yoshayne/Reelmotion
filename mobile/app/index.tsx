@@ -108,9 +108,12 @@ export default function App() {
       // Google OAuth works here; Clerk sets its session cookie for reelmotionapp.com.
       // After sign-in, /native-signin-complete redirects to reelmotion://signin-done
       // which closes the browser. We then reload the WebView so it picks up the cookie.
-      const result = await WebBrowser.openBrowserAsync(
+      // openAuthSessionAsync watches for the reelmotion:// scheme and closes
+      // the SFSafariViewController automatically when /native-signin-complete
+      // fires window.location = "reelmotion://signin-done"
+      const result = await WebBrowser.openAuthSessionAsync(
         "https://reelmotionapp.com/native-signin",
-        { dismissButtonStyle: "cancel", toolbarColor: "#000000" }
+        "reelmotion://"
       );
       addLog(`Browser closed: type=${result.type}`);
 
