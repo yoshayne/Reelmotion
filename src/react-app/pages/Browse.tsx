@@ -28,7 +28,7 @@ export default function Browse() {
   const { tagline } = useBrandAssets();
 
   useEffect(() => {
-    if (isLoaded && !isSignedIn) navigate("/", { replace: true });
+    if (isLoaded && !isSignedIn && !(window as any).__NATIVE_CLERK_TOKEN__) navigate("/", { replace: true });
   }, [isLoaded, isSignedIn, navigate]);
 
   // Fetch promo popup immediately — it's public and cached, no auth needed
@@ -61,8 +61,8 @@ export default function Browse() {
 
     Promise.all([
       apiFetch("/api/browse-data").then(r => r.json()),
-      isSignedIn ? apiFetch("/api/watchlist").then(r => r.json()).catch(() => []) : Promise.resolve([]),
-      isSignedIn ? apiFetch("/api/playback-history").then(r => r.json()).catch(() => []) : Promise.resolve([]),
+      (isSignedIn || (window as any).__NATIVE_CLERK_TOKEN__) ? apiFetch("/api/watchlist").then(r => r.json()).catch(() => []) : Promise.resolve([]),
+      (isSignedIn || (window as any).__NATIVE_CLERK_TOKEN__) ? apiFetch("/api/playback-history").then(r => r.json()).catch(() => []) : Promise.resolve([]),
     ]).then(([data, wl, history]) => {
       setBrowseData(data);
       if (Array.isArray(wl)) setWatchlist(new Set((wl as any[]).map((i: any) => i.video_id || i.id)));

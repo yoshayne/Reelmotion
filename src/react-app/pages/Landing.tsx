@@ -35,6 +35,11 @@ export default function Landing() {
   // isSignedIn will become true and the useEffect above navigates to /browse.
 
   useEffect(() => {
+    // Token may have been injected before React mounted — check immediately on mount
+    if ((window as any).__NATIVE_CLERK_TOKEN__) {
+      navigate("/browse", { replace: true });
+      return;
+    }
     const onNativeSession = () => navigate("/browse", { replace: true });
     window.addEventListener("native-session-ready", onNativeSession);
     return () => window.removeEventListener("native-session-ready", onNativeSession);
