@@ -126,10 +126,11 @@ export default function App() {
 
         if (token) {
           const userInfo = userRaw ? JSON.parse(decodeURIComponent(userRaw)) : {};
-          addLog(`Token ready for ${userInfo.email ?? "unknown"} — waiting for onLoadEnd`);
-          // Store for injection on next onLoadEnd — injecting now would be wiped
-          // if the WebView is still mid-load (which causes the token to be lost)
+          addLog(`Token ready for ${userInfo.email ?? "unknown"} — reloading WebView`);
+          // Store token then reload — reload guarantees onLoadEnd fires on a
+          // fresh stable page, preventing the "injected into mid-load" wipe issue
           pendingTokenRef.current = { token, userInfo };
+          webViewRef.current?.reload();
         } else {
           addLog("No token in URL — reloading WebView");
           webViewRef.current?.reload();
