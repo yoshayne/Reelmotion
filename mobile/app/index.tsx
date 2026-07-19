@@ -30,6 +30,7 @@ export default function App() {
   const [logs, setLogs] = useState<string[]>([`${ts()} App mounted`]);
   const injectedRef = useRef(false);
   const ssoRunning = useRef(false);
+  const pendingTokenRef = useRef<{ token: string; userInfo: Record<string, string> } | null>(null);
 
   const addLog = (msg: string) => {
     const line = `${ts()} ${msg}`;
@@ -118,25 +119,17 @@ export default function App() {
       addLog(`Browser closed: type=${result.type}`);
 
       if (result.type === "success" && result.url) {
-        addLog(`Redirect URL: ${result.url}`);
-        // Extract token and user info from the deep link URL
+        addLog(`Redirect URL received`);
         const parsed = new URL(result.url);
         const token = parsed.searchParams.get("token");
         const userRaw = parsed.searchParams.get("user");
 
-        if (token && webViewRef.current) {
+        if (token) {
           const userInfo = userRaw ? JSON.parse(decodeURIComponent(userRaw)) : {};
-          addLog(`Injecting token for ${userInfo.email ?? "unknown"}`);
-          webViewRef.current.injectJavaScript(`
-            (function() {
-              window.__NATIVE_APP__ = true;
-              window.__NATIVE_CLERK_TOKEN__ = ${JSON.stringify(token)};
-              window.__NATIVE_USER__ = ${JSON.stringify(userInfo)};
-              window.dispatchEvent(new CustomEvent('native-session-ready', { detail: { user: window.__NATIVE_USER__ } }));
-            })();
-            true;
-          `);
-          injectedRef.current = true;
+          addLog(`Token ready for ${userInfo.email ?? "unknown"} — waiting for onLoadEnd`);
+          // Store for injection on next onLoadEnd — injecting now would be wiped
+          // if the WebView is still mid-load (which causes the token to be lost)
+          pendingTokenRef.current = { token, userInfo };
         } else {
           addLog("No token in URL — reloading WebView");
           webViewRef.current?.reload();
@@ -196,6 +189,23 @@ export default function App() {
         onMessage={handleWebViewMessage}
         onLoadEnd={() => {
           addLog("WebView onLoadEnd");
+          // If a token is waiting from SSO, inject it now that the page is fully loaded
+          if (pendingTokenRef.current) {
+            const { token, userInfo } = pendingTokenRef.current;
+            pendingTokenRef.current = null;
+            addLog(`Injecting pending token for ${userInfo.email ?? "unknown"}`);
+            webViewRef.current?.injectJavaScript(`
+              (function() {
+                window.__NATIVE_APP__ = true;
+                window.__NATIVE_CLERK_TOKEN__ = ${JSON.stringify(token)};
+                window.__NATIVE_USER__ = ${JSON.stringify(userInfo)};
+                window.dispatchEvent(new CustomEvent('native-session-ready', { detail: { user: window.__NATIVE_USER__ } }));
+              })();
+              true;
+            `);
+            injectedRef.current = true;
+            return;
+          }
           if (isSignedIn) injectSession("load-end");
         }}
         startInLoadingState
