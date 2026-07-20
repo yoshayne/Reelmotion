@@ -622,7 +622,7 @@ app.get("/api/public/cover-art", async (c) => {
 app.get("/api/promo-popup", async (c) => {
   const data = await getCached("promo-popup", 3300, async () => {
     const result = await query(
-      `SELECT * FROM promo_popups
+      `SELECT *, COALESCE(frequency, 'once_per_day') as frequency FROM promo_popups
        WHERE is_active = true
          AND (start_date IS NULL OR start_date <= CURRENT_DATE)
          AND (end_date IS NULL OR end_date >= CURRENT_DATE)
@@ -1286,7 +1286,7 @@ app.put("/api/admin/contest-submissions/:id", clerkAuth, adminAuth, async (c) =>
 
 // Promo Popups
 app.get("/api/admin/promo-popups", clerkAuth, adminAuth, async (c) => {
-  const result = await query("SELECT * FROM promo_popups ORDER BY created_at DESC");
+  const result = await query("SELECT *, COALESCE(frequency, 'once_per_day') as frequency FROM promo_popups ORDER BY created_at DESC");
   return c.json(result.rows);
 });
 

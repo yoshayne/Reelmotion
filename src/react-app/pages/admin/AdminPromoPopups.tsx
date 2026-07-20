@@ -375,7 +375,7 @@ export default function AdminPromoPopups() {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate">{popup.title}</p>
                     <p className="text-xs text-gray-500 mt-0.5 truncate">{linkLabel}</p>
-                    <p className="text-xs text-gray-600 mt-0.5 capitalize">{popup.frequency.replace(/_/g, " ")}</p>
+                    <p className="text-xs text-gray-600 mt-0.5 capitalize">{(popup.frequency ?? "").replace(/_/g, " ")}</p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button onClick={() => isEditing ? closeEdit() : openEdit(popup)}

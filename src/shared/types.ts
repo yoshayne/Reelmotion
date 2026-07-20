@@ -150,7 +150,7 @@ export interface PromoPopup {
   link_video_id: number | null;
   link_series_id: number | null;
   link_custom_url: string | null;
-  frequency: string;
+  frequency: string | null;
   is_active: boolean;
   start_date: string | null;
   end_date: string | null;
