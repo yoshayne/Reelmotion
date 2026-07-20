@@ -2,7 +2,7 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -21,22 +21,16 @@ const INJECTED_JS = `
   true;
 `;
 
-const ts = () => new Date().toISOString().slice(11, 23);
 
 export default function App() {
   const { getToken, isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const webViewRef = useRef<WebView>(null);
-  const [logs, setLogs] = useState<string[]>([`${ts()} App mounted`]);
   const injectedRef = useRef(false);
   const ssoRunning = useRef(false);
   const pendingTokenRef = useRef<{ token: string; userInfo: Record<string, string> } | null>(null);
 
-  const addLog = (msg: string) => {
-    const line = `${ts()} ${msg}`;
-    console.log(`[RM] ${line}`);
-    setLogs((prev) => [...prev.slice(-40), line]);
-  };
+  const addLog = (msg: string) => console.log(`[RM] ${msg}`);
 
   useEffect(() => {
     addLog(`Auth: isLoaded=${isLoaded} isSignedIn=${isSignedIn} userId=${user?.id ?? "none"}`);
@@ -166,13 +160,6 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.debugPanel}>
-        <ScrollView style={styles.logScroll} ref={(r) => r?.scrollToEnd()}>
-          {logs.map((l, i) => (
-            <Text key={i} style={styles.logLine}>{l}</Text>
-          ))}
-        </ScrollView>
-      </View>
       <WebView
         ref={webViewRef}
         source={{ uri: APP_URL }}
@@ -222,15 +209,6 @@ export default function App() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
-  debugPanel: {
-    height: 160,
-    backgroundColor: "#0a0a0a",
-    borderBottomWidth: 1,
-    borderBottomColor: "#333",
-    paddingTop: 50,
-  },
-  logScroll: { flex: 1, paddingHorizontal: 8 },
-  logLine: { color: "#0f0", fontSize: 9, fontFamily: "monospace", lineHeight: 13 },
   webview: { flex: 1, backgroundColor: "#000" },
   loader: {
     position: "absolute",
