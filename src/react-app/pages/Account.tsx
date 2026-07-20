@@ -40,12 +40,14 @@ export default function AccountPage() {
   const [pwSuccess, setPwSuccess] = useState("");
   const [pwError, setPwError] = useState("");
 
-  useEffect(() => {
-    if (isLoaded && !user) navigate("/");
-  }, [isLoaded, user, navigate]);
+  const nativeUser = (window as any).__NATIVE_USER__ as { id?: string; email?: string; firstName?: string; imageUrl?: string } | undefined;
 
   useEffect(() => {
-    if (!user) {
+    if (isLoaded && !user && !nativeUser) navigate("/");
+  }, [isLoaded, user, nativeUser, navigate]);
+
+  useEffect(() => {
+    if (!user && !nativeUser) {
       // Clear everything when logged out so stale data never shows
       setDisplayName("");
       setAvatarUrl(null);
@@ -56,8 +58,8 @@ export default function AccountPage() {
     apiFetch("/api/users/me")
       .then((r) => r.json() as Promise<{ display_name: string; avatar_url: string; subscription: Subscription | null; role: string }>)
       .then((data) => {
-        setDisplayName(data.display_name || user.fullName || "");
-        setAvatarUrl(data.avatar_url || user.imageUrl || null);
+        setDisplayName(data.display_name || user?.fullName || nativeUser?.firstName || "");
+        setAvatarUrl(data.avatar_url || user?.imageUrl || nativeUser?.imageUrl || null);
         setSubscription(data.subscription);
         setUserRole(data.role || "");
       });

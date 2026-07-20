@@ -215,7 +215,7 @@ export default function WatchPage() {
     setSubscription(null);
     setInWatchlist(false);
     setStartTime(0);
-    if (!isLoaded || !user || !watchData) return;
+    if (!isLoaded || (!user && !(window as any).__NATIVE_CLERK_TOKEN__) || !watchData) return;
     Promise.all([
       apiFetch("/api/billing/subscription").then((r) => r.json() as Promise<Subscription | null>),
       apiFetch("/api/watchlist").then((r) => r.json() as Promise<Video[]>).catch(() => []),
