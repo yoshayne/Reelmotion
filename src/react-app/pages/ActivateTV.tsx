@@ -1,10 +1,11 @@
-import { useUser, SignInButton } from "@clerk/clerk-react";
+import { SignInButton } from "@clerk/clerk-react";
+import { useEffectiveAuth } from "@/react-app/hooks/useEffectiveAuth";
 import { useState, useRef, useEffect } from "react";
 import { CheckCircle } from "lucide-react";
 import { apiFetch } from "@/react-app/utils/api";
 
 export default function ActivateTVPage() {
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded, isSignedIn } = useEffectiveAuth();
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");

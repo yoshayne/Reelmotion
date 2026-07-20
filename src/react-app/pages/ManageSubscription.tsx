@@ -1,15 +1,15 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
-import { useUser } from "@clerk/clerk-react";
+import { useEffectiveAuth } from "@/react-app/hooks/useEffectiveAuth";
 import { apiFetch } from "@/react-app/utils/api";
 
 export default function ManageSubscriptionPage() {
-  const { user, isLoaded } = useUser();
+  const { isSignedIn, isLoaded } = useEffectiveAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!isLoaded) return;
-    if (!user) {
+    if (!isSignedIn) {
       navigate("/");
       return;
     }
@@ -23,7 +23,7 @@ export default function ManageSubscriptionPage() {
         }
       })
       .catch(() => navigate("/account"));
-  }, [isLoaded, user, navigate]);
+  }, [isLoaded, isSignedIn, navigate]);
 
   return (
     <div className="min-h-screen bg-black text-white">

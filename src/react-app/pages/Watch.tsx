@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { useUser, useClerk } from "@clerk/clerk-react";
+import { useEffectiveAuth } from "@/react-app/hooks/useEffectiveAuth";
 import MuxPlayerWrapper from "@/react-app/components/MuxPlayerWrapper";
 import { apiFetch } from "@/react-app/utils/api";
 import { hasAccess } from "@/react-app/utils/access";
@@ -29,7 +30,8 @@ function relativeTime(dateStr: string): string {
 }
 
 function CommentSection({ videoId, isAdmin, canComment }: { videoId: number; isAdmin: boolean; canComment: boolean }) {
-  const { user, isLoaded } = useUser();
+  const { isLoaded } = useUser();
+  const { isSignedIn: effectiveSignedIn } = useEffectiveAuth();
   const { openSignIn } = useClerk();
   const [comments, setComments] = useState<Comment[]>([]);
   const [body, setBody] = useState("");
@@ -72,13 +74,13 @@ function CommentSection({ videoId, isAdmin, canComment }: { videoId: number; isA
     setComments(prev => prev.filter(c => c.id !== id));
   };
 
-  if (!isLoaded) return null;
+  if (!isLoaded && !effectiveSignedIn) return null;
 
   return (
     <div className="mt-10">
       <h2 className="text-lg font-black mb-4">{comments.length > 0 ? `${comments.length} Comment${comments.length !== 1 ? "s" : ""}` : "Comments"}</h2>
 
-      {!user ? (
+      {!effectiveSignedIn ? (
         /* Not signed in */
         <div className="mb-6 relative rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
           <div className="px-4 py-10 bg-zinc-900 flex flex-col items-center gap-3 text-center">
@@ -189,6 +191,7 @@ export default function WatchPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isLoaded } = useUser();
+  const { isSignedIn } = useEffectiveAuth();
   const { tagline } = useBrandAssets();
   const [watchData, setWatchData] = useState<WatchData | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -230,7 +233,7 @@ export default function WatchPage() {
 
   const handleTimeUpdate = useCallback(
     (time: number, duration: number) => {
-      if (!user || !watchData) return;
+      if (!isSignedIn || !watchData) return;
       // Save at most once every 15 seconds to avoid hammering the DB
       const now = Date.now();
       if (now - lastSavedRef.current < 15_000) return;
@@ -253,7 +256,7 @@ export default function WatchPage() {
   );
 
   const toggleWatchlist = async () => {
-    if (!user || !watchData) { navigate("/subscribe"); return; }
+    if (!isSignedIn || !watchData) { navigate("/subscribe"); return; }
     if (inWatchlist) {
       await apiFetch(`/api/watchlist/${watchData.video.id}`, { method: "DELETE" });
       setInWatchlist(false);
@@ -344,7 +347,7 @@ export default function WatchPage() {
                 <p className="text-sm max-w-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
                   Join the ReelMotion community to watch this film.
                 </p>
-                {!user ? (
+                {!isSignedIn ? (
                   <Link to="/">
                     <div style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '12px 24px', display: 'inline-block' }}>
                       <span className="font-extrabold text-sm tracking-[0.08em] uppercase" style={{ transform: 'skewX(6deg)', display: 'block' }}>Sign In to Watch</span>

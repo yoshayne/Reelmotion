@@ -1,29 +1,29 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router";
-import { useUser } from "@clerk/clerk-react";
+import { useEffectiveAuth } from "@/react-app/hooks/useEffectiveAuth";
 import { apiFetch } from "@/react-app/utils/api";
 import { hasAccess } from "@/react-app/utils/access";
 import type { Subscription } from "@/shared/types";
 import { CheckCircle, ExternalLink } from "lucide-react";
 
 export default function SubscriptionPage() {
-  const { user, isLoaded } = useUser();
+  const { isSignedIn, isLoaded } = useEffectiveAuth();
   const navigate = useNavigate();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [managingPortal, setManagingPortal] = useState(false);
 
   useEffect(() => {
-    if (isLoaded && !user) navigate("/");
-  }, [isLoaded, user, navigate]);
+    if (isLoaded && !isSignedIn) navigate("/");
+  }, [isLoaded, isSignedIn, navigate]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!isSignedIn) return;
     apiFetch("/api/billing/subscription")
       .then((r) => r.json() as Promise<Subscription | null>)
       .then(setSubscription)
       .finally(() => setLoading(false));
-  }, [user]);
+  }, [isSignedIn]);
 
   const handleManage = async () => {
     setManagingPortal(true);

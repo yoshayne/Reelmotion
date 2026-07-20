@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router";
-import { useUser } from "@clerk/clerk-react";
+import { useEffectiveAuth } from "@/react-app/hooks/useEffectiveAuth";
 import { apiFetch } from "@/react-app/utils/api";
 import { hasAccess } from "@/react-app/utils/access";
 import type { Video, Subscription } from "@/shared/types";
@@ -9,7 +9,7 @@ import { Play, Lock, Bookmark, BookmarkCheck, ChevronLeft } from "lucide-react";
 export default function MovieInfo() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useUser();
+  const { isSignedIn } = useEffectiveAuth();
   const [video, setVideo] = useState<Video | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [inWatchlist, setInWatchlist] = useState(false);
@@ -24,7 +24,7 @@ export default function MovieInfo() {
   }, [id]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!isSignedIn) return;
     Promise.all([
       apiFetch("/api/billing/subscription").then((r) => r.json() as Promise<Subscription | null>),
       apiFetch("/api/watchlist").then((r) => r.json() as Promise<Video[]>),
@@ -32,13 +32,13 @@ export default function MovieInfo() {
       setSubscription(sub);
       setInWatchlist(wl.some((v) => v.id === Number(id)));
     });
-  }, [user, id]);
+  }, [isSignedIn, id]);
 
   const userHasAccess = hasAccess(subscription);
   const canWatch = userHasAccess || video?.is_free;
 
   const toggleWatchlist = async () => {
-    if (!user) return;
+    if (!isSignedIn) return;
     if (inWatchlist) {
       await apiFetch(`/api/watchlist/${id}`, { method: "DELETE" });
       setInWatchlist(false);
@@ -154,7 +154,7 @@ export default function MovieInfo() {
               Join to Watch
             </Link>
           )}
-          {user && (
+          {isSignedIn && (
             <button
               onClick={toggleWatchlist}
               className="px-5 py-3.5 bg-gray-800 hover:bg-gray-700 rounded-xl flex items-center gap-2 font-medium transition-colors"

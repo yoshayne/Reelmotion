@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router";
-import { useUser } from "@clerk/clerk-react";
+import { useEffectiveAuth } from "@/react-app/hooks/useEffectiveAuth";
 import { apiFetch } from "@/react-app/utils/api";
 import { hasAccess } from "@/react-app/utils/access";
 import { getThumbnailUrl } from "@/react-app/utils/thumbnail";
@@ -16,7 +16,7 @@ function isNew(createdAt?: string | null) {
 export default function SeriesPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useUser();
+  const { isSignedIn } = useEffectiveAuth();
   const [series, setSeries] = useState<Series | null>(null);
   const [episodes, setEpisodes] = useState<Video[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -36,11 +36,11 @@ export default function SeriesPage() {
   }, [id]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!isSignedIn) return;
     apiFetch("/api/billing/subscription")
       .then((r) => r.json() as Promise<Subscription | null>)
       .then(setSubscription);
-  }, [user]);
+  }, [isSignedIn]);
 
   const userHasAccess = hasAccess(subscription);
 
