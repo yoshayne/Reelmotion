@@ -9,6 +9,12 @@ import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
 import type { Video, Subscription } from "@/shared/types";
 import { Bookmark, BookmarkCheck, ChevronRight, Lock, Play, ArrowLeft, Trash2, Share2 } from "lucide-react";
 
+function isInAppBrowser() {
+  const ua = navigator.userAgent;
+  return /FBAN|FBAV|Instagram|TwitterAndroid|Line\/|MicroMessenger|GSA\//.test(ua)
+    || (/iPhone|iPad/.test(ua) && !/Safari\//.test(ua) && /AppleWebKit/.test(ua) && !(window as any).__NATIVE_APP__);
+}
+
 interface Comment {
   id: number;
   body: string;
@@ -363,11 +369,27 @@ export default function WatchPage() {
                     <p className="text-sm max-w-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
                       Create a free account to watch this{video.is_free ? " film" : " and more"}.
                     </p>
-                    <Link to="/">
-                      <div style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '12px 24px', display: 'inline-block' }}>
-                        <span className="font-extrabold text-sm tracking-[0.08em] uppercase" style={{ transform: 'skewX(6deg)', display: 'block' }}>Create Account</span>
+                    {isInAppBrowser() ? (
+                      <div style={{ textAlign: 'center' }}>
+                        <p className="text-xs mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                          Tap the menu (⋯) and choose <strong style={{ color: '#fff' }}>Open in Safari</strong> to create your account.
+                        </p>
+                        <a
+                          href={window.location.href}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ display: 'inline-block', transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '12px 24px' }}
+                        >
+                          <span style={{ transform: 'skewX(6deg)', display: 'block', fontWeight: 800, fontSize: 13, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Open in Safari</span>
+                        </a>
                       </div>
-                    </Link>
+                    ) : (
+                      <Link to="/">
+                        <div style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '12px 24px', display: 'inline-block' }}>
+                          <span className="font-extrabold text-sm tracking-[0.08em] uppercase" style={{ transform: 'skewX(6deg)', display: 'block' }}>Create Account</span>
+                        </div>
+                      </Link>
+                    )}
                   </>
                 ) : (
                   <>
