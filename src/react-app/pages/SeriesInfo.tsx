@@ -102,7 +102,7 @@ export default function SeriesInfo() {
 
         <div className="flex gap-3 mt-4">
           <Link
-            to={`/series/${series.id}`}
+            to={`/series/${series.slug || series.id}`}
             className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors"
           >
             <Play className="w-5 h-5 fill-black" />

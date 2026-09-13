@@ -12,7 +12,7 @@ export default function SeriesCard({ series }: SeriesCardProps) {
 
   return (
     <div
-      onClick={() => navigate(`/series-info/${series.id}`)}
+      onClick={() => navigate(`/series-info/${series.slug || series.id}`)}
       className="group relative flex-shrink-0 w-40 md:w-52 cursor-pointer"
     >
       <div

@@ -2431,6 +2431,113 @@ try {
   console.error("Failed to register daily email cron:", err);
 }
 
+// ─── Dynamic OG tag injection ────────────────────────────────────────────────
+// Social crawlers (Facebook, Twitter, iMessage, Slack, Discord) fetch the page
+// server-side and read <meta> tags — they never run JavaScript. These routes
+// intercept content pages, look up the title/image, and inject OG tags into
+// the static index.html before returning it. All other routes fall through to
+// the SPA catch-all below.
+
+const APP_URL = process.env.APP_URL ?? "https://reelmotionapp.com";
+
+function muxThumbnail(playbackId: string) {
+  return `https://image.mux.com/${playbackId}/thumbnail.jpg?width=1200&height=630&fit_mode=smartcrop&time=2`;
+}
+
+async function injectOG(html: string, tags: {
+  title: string;
+  description: string;
+  image: string;
+  url: string;
+}): Promise<string> {
+  const { title, description, image, url } = tags;
+  const escaped = (s: string) => s.replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  const ogBlock = `
+    <meta property="og:type" content="video.movie" />
+    <meta property="og:site_name" content="ReelMotion" />
+    <meta property="og:title" content="${escaped(title)}" />
+    <meta property="og:description" content="${escaped(description)}" />
+    <meta property="og:image" content="${image}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:url" content="${url}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${escaped(title)}" />
+    <meta name="twitter:description" content="${escaped(description)}" />
+    <meta name="twitter:image" content="${image}" />
+    <title>${escaped(title)} — ReelMotion</title>`;
+  // Replace the static block between <!-- Open Graph --> and <!-- Twitter / X Card --> end
+  return html
+    .replace(/<title>[^<]*<\/title>/, "")
+    .replace(/<!-- Open Graph[\s\S]*?<\/head>/, ogBlock + "\n  </head>");
+}
+
+async function getSpaHtml(): Promise<string> {
+  const fs = await import("node:fs");
+  return fs.readFileSync("./dist/client/index.html", "utf-8");
+}
+
+// /watch/:id and /movie-info/:id — single video or episode
+for (const prefix of ["/watch", "/movie-info"]) {
+  app.get(`${prefix}/:id`, async (c) => {
+    const id = c.req.param("id");
+    const isSlug = isNaN(Number(id));
+    try {
+      const result = await query(
+        `SELECT v.title, v.description, v.slug, v.thumbnail_url, v.hero_image_url,
+                v.carousel_image_url, v.mux_playback_id, s.title as series_title
+         FROM videos v LEFT JOIN series s ON v.series_id = s.id
+         WHERE ${isSlug ? "v.slug = $1" : "v.id = $1"}`,
+        [isSlug ? id : Number(id)]
+      );
+      if (!result.rows.length) return c.html(await getSpaHtml());
+      const v = result.rows[0] as any;
+      const image = v.hero_image_url || v.carousel_image_url || v.thumbnail_url ||
+        (v.mux_playback_id ? muxThumbnail(v.mux_playback_id) : null) ||
+        `${APP_URL}/api/og-image`;
+      const title = v.series_title ? `${v.title} — ${v.series_title}` : v.title;
+      const slug = v.slug || id;
+      const url = `${APP_URL}${prefix}/${slug}`;
+      return c.html(await injectOG(await getSpaHtml(), {
+        title,
+        description: v.description || `Watch ${title} on ReelMotion`,
+        image,
+        url,
+      }));
+    } catch {
+      return c.html(await getSpaHtml());
+    }
+  });
+}
+
+// /series/:id and /series-info/:id
+for (const prefix of ["/series", "/series-info"]) {
+  app.get(`${prefix}/:id`, async (c) => {
+    const id = c.req.param("id");
+    const isSlug = isNaN(Number(id));
+    try {
+      const result = await query(
+        `SELECT title, description, slug, cover_image_url, carousel_image_url
+         FROM series WHERE ${isSlug ? "slug = $1" : "id = $1"}`,
+        [isSlug ? id : Number(id)]
+      );
+      if (!result.rows.length) return c.html(await getSpaHtml());
+      const s = result.rows[0] as any;
+      const image = s.cover_image_url || s.carousel_image_url || `${APP_URL}/api/og-image`;
+      const slug = s.slug || id;
+      const url = `${APP_URL}${prefix}/${slug}`;
+      return c.html(await injectOG(await getSpaHtml(), {
+        title: s.title,
+        description: s.description || `Watch ${s.title} on ReelMotion`,
+        image,
+        url,
+      }));
+    } catch {
+      return c.html(await getSpaHtml());
+    }
+  });
+}
+
 // ─── SPA fallback ────────────────────────────────────────────────────────────
 // Any unhandled /api/* request returns JSON 404 — never falls through to HTML
 app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));

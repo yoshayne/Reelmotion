@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router";
-import { useEffectiveAuth } from "@/react-app/hooks/useEffectiveAuth";
+import { useUser } from "@clerk/clerk-react";
 import { apiFetch } from "@/react-app/utils/api";
 import { hasAccess } from "@/react-app/utils/access";
 import { getThumbnailUrl } from "@/react-app/utils/thumbnail";
@@ -16,7 +16,7 @@ function isNew(createdAt?: string | null) {
 export default function SeriesPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isSignedIn } = useEffectiveAuth();
+  const { user } = useUser();
   const [series, setSeries] = useState<Series | null>(null);
   const [episodes, setEpisodes] = useState<Video[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -36,11 +36,11 @@ export default function SeriesPage() {
   }, [id]);
 
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (!user) return;
     apiFetch("/api/billing/subscription")
       .then((r) => r.json() as Promise<Subscription | null>)
       .then(setSubscription);
-  }, [isSignedIn]);
+  }, [user]);
 
   const userHasAccess = hasAccess(subscription);
 
@@ -129,21 +129,18 @@ export default function SeriesPage() {
               <div className="space-y-3">
                 {seasonEpisodes.map((ep) => {
                   const canWatch = userHasAccess || ep.is_free;
-                  const isFutureEp = !!(ep.release_date && new Date(ep.release_date) > new Date());
                   const epImage = getThumbnailUrl(
-                    ep.hero_image_url || ep.thumbnail_url || ep.carousel_image_url || null,
+                    ep.hero_image_url || ep.thumbnail_url || ep.carousel_image_url || imageUrl,
                     ep.mux_playback_id,
                     ep.mux_duration
-                  ) || imageUrl;
+                  );
                   const episodeIsNew = isNew(ep.created_at);
                   return (
                     <div
                       key={ep.id}
-                      onClick={() => navigate(`/watch/${ep.id}`)}
-                      className="flex gap-3 p-3 bg-gray-900/50 border border-gray-800 rounded-xl cursor-pointer hover:border-purple-600/40 transition-colors group"
-                      style={{
-                        borderColor: isFutureEp ? 'rgba(107,33,168,0.3)' : episodeIsNew ? 'rgba(232,0,29,0.25)' : undefined,
-                      }}
+                      onClick={() => navigate(`/watch/${ep.slug || ep.id}`)}
+                      className="flex gap-3 p-3 bg-gray-900/50 border border-gray-800 rounded-xl cursor-pointer hover:border-red-600/40 transition-colors group"
+                      style={episodeIsNew ? { borderColor: 'rgba(232,0,29,0.25)' } : undefined}
                     >
                       <div className="relative flex-shrink-0 w-32 aspect-video rounded-lg overflow-hidden bg-gray-800">
                         {epImage ? (
@@ -153,26 +150,18 @@ export default function SeriesPage() {
                             className="w-full h-full object-cover"
                           />
                         ) : null}
-                        {isFutureEp ? (
-                          <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest text-white" style={{ backgroundColor: '#6b21a8' }}>
-                            {ep.release_date
-                              ? new Date(ep.release_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase()
-                              : "COMING SOON"}
-                          </div>
-                        ) : episodeIsNew ? (
+                        {episodeIsNew && (
                           <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest" style={{ backgroundColor: '#E8001D' }}>
                             NEW
                           </div>
-                        ) : null}
-                        {!isFutureEp && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {canWatch ? (
-                              <Play className="w-8 h-8 fill-white" />
-                            ) : (
-                              <Lock className="w-6 h-6 text-gray-300" />
-                            )}
-                          </div>
                         )}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {canWatch ? (
+                            <Play className="w-8 h-8 fill-white" />
+                          ) : (
+                            <Lock className="w-6 h-6 text-gray-300" />
+                          )}
+                        </div>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
@@ -180,23 +169,14 @@ export default function SeriesPage() {
                             <p className="text-xs text-gray-500 mb-0.5">Episode {ep.episode_number}</p>
                             <p className="font-medium truncate">{ep.title}</p>
                           </div>
-                          {isFutureEp ? (
-                            <span className="text-[10px] font-bold text-purple-400 flex-shrink-0 mt-1">SOON</span>
-                          ) : !canWatch ? (
-                            <Lock className="w-4 h-4 text-gray-600 flex-shrink-0 mt-1" />
-                          ) : null}
+                          {!canWatch && <Lock className="w-4 h-4 text-gray-600 flex-shrink-0 mt-1" />}
                         </div>
                         {ep.description && (
                           <p className="text-sm text-gray-400 mt-1 line-clamp-2">{ep.description}</p>
                         )}
-                        {!isFutureEp && ep.mux_duration && (
+                        {ep.mux_duration && (
                           <p className="text-xs text-gray-600 mt-1">
                             {Math.floor(ep.mux_duration / 60)} min
-                          </p>
-                        )}
-                        {isFutureEp && ep.release_date && (
-                          <p className="text-xs mt-1" style={{ color: 'rgba(167,139,250,0.7)' }}>
-                            Available {new Date(ep.release_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
                           </p>
                         )}
                       </div>

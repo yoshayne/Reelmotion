@@ -18,17 +18,18 @@ export default function VideoCard({ video, hasAccess = false, showProgress = fal
       : 0;
 
   const handleClick = () => {
+    const key = video.slug || video.id;
     if (video.content_type === "movie" || video.content_type === "clip") {
-      navigate(`/movie-info/${video.id}`);
+      navigate(`/movie-info/${key}`);
     } else {
-      navigate(`/watch/${video.id}`);
+      navigate(`/watch/${key}`);
     }
   };
 
   const handlePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (hasAccess || video.is_free) {
-      navigate(`/watch/${video.id}`);
+      navigate(`/watch/${video.slug || video.id}`);
     } else {
       navigate("/subscribe");
     }

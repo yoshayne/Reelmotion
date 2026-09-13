@@ -452,7 +452,7 @@ export default function Browse() {
             <SectionHead eyebrow="PICK UP WHERE YOU LEFT OFF" title="Continue Watching" />
             <ScrollRow>
               {continueWatching.map((item: any) => (
-                <div key={item.id} onClick={() => navigate(`/watch/${item.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 180 }}>
+                <div key={item.id} onClick={() => navigate(`/watch/${item.slug || item.video_id || item.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 180 }}>
                   <div className="relative overflow-hidden rounded" style={{ height: 102, clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%)' }}>
                     {getThumbnailUrl(item.thumbnail_url, item.mux_playback_id, item.mux_duration) ? (
                       <img src={getThumbnailUrl(item.thumbnail_url, item.mux_playback_id, item.mux_duration)!} alt={item.title} className="w-full h-full object-cover" />
@@ -495,7 +495,7 @@ export default function Browse() {
                   key={s.id}
                   image={s.cover_image_url}
                   title={s.title}
-                  onClick={() => navigate(`/series/${s.id}`)}
+                  onClick={() => navigate(`/series/${s.slug || s.id}`)}
                 />
               ))}
             </ScrollRow>
@@ -514,7 +514,7 @@ export default function Browse() {
                       key={`series-${card.series.id}`}
                       image={card.series.cover_image_url || card.series.carousel_image_url}
                       title={card.series.title}
-                      onClick={() => navigate(`/series/${card.series.id}`)}
+                      onClick={() => navigate(`/series/${card.series.slug || card.series.id}`)}
                       badge={
                         card.isFree
                           ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span>
@@ -531,7 +531,7 @@ export default function Browse() {
                     muxPlaybackId={v.mux_playback_id}
                     muxDuration={v.mux_duration}
                     title={v.title}
-                    onClick={() => navigate(v.content_type === "episode" ? `/watch/${v.id}` : `/movie-info/${v.id}`)}
+                    onClick={() => navigate(v.content_type === "episode" ? `/watch/${v.slug || v.id}` : `/movie-info/${v.slug || v.id}`)}
                     badge={
                       v.is_free
                         ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span>
@@ -613,7 +613,7 @@ export default function Browse() {
                   muxPlaybackId={v.mux_playback_id}
                   muxDuration={v.mux_duration}
                   title={v.title}
-                  onClick={() => navigate(`/watch/${v.id}`)}
+                  onClick={() => navigate(`/watch/${v.slug || v.id}`)}
                   badge={v.is_free ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span> : undefined}
                 />
               ))}
@@ -628,7 +628,7 @@ export default function Browse() {
             <div className="overflow-x-auto scrollbar-hide">
               <div className="flex gap-3 px-4">
                 {clips.slice(0, 10).map((v: Video) => (
-                  <div key={v.id} onClick={() => navigate(`/watch/${v.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 120 }}>
+                  <div key={v.id} onClick={() => navigate(`/watch/${v.slug || v.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 120 }}>
                     <div className="relative overflow-hidden" style={{ aspectRatio: '9/16', clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)' }}>
                       {getThumbnailUrl(v.thumbnail_url, v.mux_playback_id, v.mux_duration) ? (
                         <img src={getThumbnailUrl(v.thumbnail_url, v.mux_playback_id, v.mux_duration)!} alt={v.title} className="w-full h-full object-cover" />

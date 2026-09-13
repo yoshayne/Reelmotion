@@ -66,7 +66,7 @@ export default function ContinueWatchingRow({ items }: ContinueWatchingRowProps)
             return (
               <div
                 key={item.id}
-                onClick={() => navigate(`/watch/${item.video_id}`)}
+                onClick={() => navigate(`/watch/${item.slug || item.video_id}`)}
                 className="group relative flex-shrink-0 w-56 md:w-72 cursor-pointer"
               >
                 <div className="relative aspect-video rounded-xl overflow-hidden border border-red-600/20 transition-all duration-300 group-hover:border-red-600/50 group-hover:shadow-lg group-hover:shadow-red-600/20">

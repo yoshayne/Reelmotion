@@ -330,7 +330,7 @@ export default function WatchPage() {
               video={video}
               startTime={startTime}
               onTimeUpdate={handleTimeUpdate}
-              onEnded={() => { if (nextEpisode) navigate(`/watch/${nextEpisode.id}`); }}
+              onEnded={() => { if (nextEpisode) navigate(`/watch/${nextEpisode.slug || nextEpisode.id}`); }}
               autoPlay={false}
               subtitlesEnabled={video.subtitles_enabled ?? true}
             />
@@ -435,7 +435,7 @@ export default function WatchPage() {
             <div
               className="mt-6 p-4 rounded-xl cursor-pointer group"
               style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
-              onClick={() => navigate(`/watch/${nextEpisode.id}`)}
+              onClick={() => navigate(`/watch/${nextEpisode.slug || nextEpisode.id}`)}
             >
               <p className="text-xs font-extrabold tracking-[0.15em] uppercase mb-3" style={{ color: 'rgba(255,255,255,0.35)' }}>Next Episode</p>
               <div className="flex gap-3">
@@ -466,7 +466,7 @@ export default function WatchPage() {
           {/* Series link */}
           {video.series_id && (
             <Link
-              to={`/series/${video.series_id}`}
+              to={`/series/${video.series_slug || video.series_id}`}
               className="mt-4 inline-flex items-center gap-2 text-sm transition-colors"
               style={{ color: '#E8001D' }}
             >

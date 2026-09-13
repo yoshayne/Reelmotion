@@ -48,8 +48,8 @@ export default function ComingSoonRow({ items }: ComingSoonRowProps) {
   };
 
   const handleClick = (item: ComingSoonItem) => {
-    if (item.item_type === "video") navigate(`/movie-info/${item.id}`);
-    else navigate(`/series-info/${item.id}`);
+    if (item.item_type === "video") navigate(`/movie-info/${item.slug || item.id}`);
+    else navigate(`/series-info/${item.slug || item.id}`);
   };
 
   if (items.length === 0) return null;

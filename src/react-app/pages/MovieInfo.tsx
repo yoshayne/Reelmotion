@@ -139,7 +139,7 @@ export default function MovieInfo() {
         <div className="flex gap-3 mt-6">
           {canWatch ? (
             <Link
-              to={`/watch/${video.id}`}
+              to={`/watch/${video.slug || video.id}`}
               className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors"
             >
               <Play className="w-5 h-5 fill-black" />
@@ -171,7 +171,7 @@ export default function MovieInfo() {
 
         {video.series_id && (
           <Link
-            to={`/series/${video.series_id}`}
+            to={`/series/${video.series_slug || video.series_id}`}
             className="mt-4 inline-flex items-center gap-1 text-sm text-red-500 hover:text-red-400 transition-colors"
           >
             View full series
