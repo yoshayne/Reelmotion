@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 
 interface ComingSoonItem {
   id: number;
+  slug?: string | null;
   title: string;
   thumbnail_url?: string | null;
   cover_image_url?: string | null;
