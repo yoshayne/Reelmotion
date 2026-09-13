@@ -7,7 +7,7 @@ import { apiFetch } from "@/react-app/utils/api";
 import { hasAccess } from "@/react-app/utils/access";
 import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
 import type { Video, Subscription } from "@/shared/types";
-import { Bookmark, BookmarkCheck, ChevronRight, Lock, Play, ArrowLeft, Trash2 } from "lucide-react";
+import { Bookmark, BookmarkCheck, ChevronRight, Lock, Play, ArrowLeft, Trash2, Share2 } from "lucide-react";
 
 interface Comment {
   id: number;
@@ -196,6 +196,7 @@ export default function WatchPage() {
   const [watchData, setWatchData] = useState<WatchData | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [inWatchlist, setInWatchlist] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [startTime, setStartTime] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -254,6 +255,18 @@ export default function WatchPage() {
     },
     [user, watchData]
   );
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const title = watchData?.video?.title ?? "Watch on ReelMotion";
+    if (navigator.share) {
+      try { await navigator.share({ title, url }); } catch {}
+    } else {
+      await navigator.clipboard.writeText(url).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const toggleWatchlist = async () => {
     if (!isSignedIn || !watchData) { navigate("/subscribe"); return; }
@@ -380,16 +393,28 @@ export default function WatchPage() {
                 </p>
               )}
             </div>
-            <button
-              onClick={toggleWatchlist}
-              className="flex-shrink-0 flex flex-col items-center gap-1 transition-colors pt-1"
-              style={{ color: inWatchlist ? '#E8001D' : 'rgba(255,255,255,0.4)' }}
-            >
-              {inWatchlist ? <BookmarkCheck className="w-6 h-6" /> : <Bookmark className="w-6 h-6" />}
-              <span className="font-bold tracking-widest uppercase" style={{ fontSize: 9 }}>
-                {inWatchlist ? "Saved" : "My List"}
-              </span>
-            </button>
+            <div className="flex-shrink-0 flex items-center gap-4 pt-1">
+              <button
+                onClick={handleShare}
+                className="flex flex-col items-center gap-1 transition-colors"
+                style={{ color: 'rgba(255,255,255,0.4)' }}
+              >
+                <Share2 className="w-6 h-6" />
+                <span className="font-bold tracking-widest uppercase" style={{ fontSize: 9 }}>
+                  {copied ? "Copied!" : "Share"}
+                </span>
+              </button>
+              <button
+                onClick={toggleWatchlist}
+                className="flex flex-col items-center gap-1 transition-colors"
+                style={{ color: inWatchlist ? '#E8001D' : 'rgba(255,255,255,0.4)' }}
+              >
+                {inWatchlist ? <BookmarkCheck className="w-6 h-6" /> : <Bookmark className="w-6 h-6" />}
+                <span className="font-bold tracking-widest uppercase" style={{ fontSize: 9 }}>
+                  {inWatchlist ? "Saved" : "My List"}
+                </span>
+              </button>
+            </div>
           </div>
 
           {/* Badges */}

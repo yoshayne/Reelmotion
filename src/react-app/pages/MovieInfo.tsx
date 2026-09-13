@@ -4,7 +4,7 @@ import { useEffectiveAuth } from "@/react-app/hooks/useEffectiveAuth";
 import { apiFetch } from "@/react-app/utils/api";
 import { hasAccess } from "@/react-app/utils/access";
 import type { Video, Subscription } from "@/shared/types";
-import { Play, Lock, Bookmark, BookmarkCheck, ChevronLeft } from "lucide-react";
+import { Play, Lock, Bookmark, BookmarkCheck, ChevronLeft, Share2 } from "lucide-react";
 
 export default function MovieInfo() {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +14,19 @@ export default function MovieInfo() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [inWatchlist, setInWatchlist] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const title = video?.title ?? "Watch on ReelMotion";
+    if (navigator.share) {
+      try { await navigator.share({ title, url }); } catch {}
+    } else {
+      await navigator.clipboard.writeText(url).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -154,6 +167,13 @@ export default function MovieInfo() {
               Join to Watch
             </Link>
           )}
+          <button
+            onClick={handleShare}
+            className="px-5 py-3.5 bg-gray-800 hover:bg-gray-700 rounded-xl flex items-center gap-2 font-medium transition-colors"
+          >
+            <Share2 className="w-5 h-5" />
+            {copied ? "Copied!" : "Share"}
+          </button>
           {isSignedIn && (
             <button
               onClick={toggleWatchlist}
