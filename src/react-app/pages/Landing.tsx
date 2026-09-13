@@ -3,22 +3,16 @@ import { useNavigate } from "react-router";
 import { useEffect } from "react";
 import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
 
-function isInAppBrowser() {
-  const ua = navigator.userAgent;
-  return /FBAN|FBAV|Instagram|TwitterAndroid|Line\/|MicroMessenger|GSA\//.test(ua)
-    || (/iPhone|iPad/.test(ua) && !/Safari\//.test(ua) && /AppleWebKit/.test(ua) && !(window as any).__NATIVE_APP__);
-}
-
 export default function Landing() {
   const { isSignedIn } = useUser();
   const { signIn } = useSignIn();
   const navigate = useNavigate();
   const { logo, tagline } = useBrandAssets();
-  const inAppBrowser = isInAppBrowser();
+  const next = new URLSearchParams(window.location.search).get("next");
 
   useEffect(() => {
-    if (isSignedIn) navigate("/browse", { replace: true });
-  }, [isSignedIn, navigate]);
+    if (isSignedIn) navigate(next || "/browse", { replace: true });
+  }, [isSignedIn, navigate, next]);
 
   const handleGoogleSignIn = () => {
     if ((window as any).__NATIVE_APP__) {
@@ -33,7 +27,7 @@ export default function Landing() {
     signIn?.authenticateWithRedirect({
       strategy: "oauth_google",
       redirectUrl: "/sso-callback",
-      redirectUrlComplete: "/browse",
+      redirectUrlComplete: next || "/browse",
     });
   };
 
@@ -98,41 +92,19 @@ export default function Landing() {
             <h2 className="text-xl font-bold text-center mb-2">Join the Community</h2>
             <p className="text-sm text-zinc-400 text-center mb-6">Become the Culture</p>
 
-            {inAppBrowser ? (
-              /* In-app browsers (Threads, Instagram, etc.) block Google OAuth.
-                 Show a clear prompt to open in Safari instead. */
-              <div className="text-center">
-                <div className="text-4xl mb-3">🔗</div>
-                <p className="text-sm font-semibold mb-1">Open in Safari to sign in</p>
-                <p className="text-xs text-zinc-400 mb-5">
-                  Google sign-in doesn't work inside Threads or Instagram. Tap the menu (⋯) and choose <strong className="text-white">Open in Safari</strong>.
-                </p>
-                <a
-                  href={window.location.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-block w-full py-3 px-6 rounded-xl font-semibold text-sm text-center"
-                  style={{ backgroundColor: '#E8001D' }}
-                >
-                  Open in Safari
-                </a>
-              </div>
-            ) : (
-              /* Google button */
-              <button
-                onClick={handleGoogleSignIn}
-                className="w-full flex items-center justify-center gap-3 bg-white text-black font-semibold py-3 px-6 rounded-xl hover:bg-zinc-100 transition-all group relative overflow-hidden"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                </svg>
-                <span>Continue with Google</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-              </button>
-            )}
+            <button
+              onClick={handleGoogleSignIn}
+              className="w-full flex items-center justify-center gap-3 bg-white text-black font-semibold py-3 px-6 rounded-xl hover:bg-zinc-100 transition-all group relative overflow-hidden"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              <span>Continue with Google</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+            </button>
 
             {/* Bottom accent */}
             <div

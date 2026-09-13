@@ -48,7 +48,7 @@ export default function MovieInfo() {
   }, [isSignedIn, id]);
 
   const userHasAccess = hasAccess(subscription);
-  const canWatch = isSignedIn && (userHasAccess || video?.is_free);
+  const canWatch = userHasAccess || video?.is_free;
 
   const toggleWatchlist = async () => {
     if (!isSignedIn) return;
@@ -157,14 +157,6 @@ export default function MovieInfo() {
             >
               <Play className="w-5 h-5 fill-black" />
               Play
-            </Link>
-          ) : !isSignedIn ? (
-            <Link
-              to="/"
-              className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-red-600 hover:bg-red-700 font-bold rounded-xl transition-colors"
-            >
-              <Lock className="w-5 h-5" />
-              Create Account to Watch
             </Link>
           ) : (
             <Link
