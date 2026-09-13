@@ -2477,38 +2477,134 @@ async function getSpaHtml(): Promise<string> {
   return fs.readFileSync("./dist/client/index.html", "utf-8");
 }
 
-// /watch/:id and /movie-info/:id — single video or episode
-for (const prefix of ["/watch", "/movie-info"]) {
-  app.get(`${prefix}/:id`, async (c) => {
-    const id = c.req.param("id");
-    const isSlug = isNaN(Number(id));
-    try {
-      const result = await query(
-        `SELECT v.title, v.description, v.slug, v.thumbnail_url, v.hero_image_url,
-                v.carousel_image_url, v.mux_playback_id, s.title as series_title
-         FROM videos v LEFT JOIN series s ON v.series_id = s.id
-         WHERE ${isSlug ? "v.slug = $1" : "v.id = $1"}`,
-        [isSlug ? id : Number(id)]
-      );
-      if (!result.rows.length) return c.html(await getSpaHtml());
-      const v = result.rows[0] as any;
-      const image = v.hero_image_url || v.carousel_image_url || v.thumbnail_url ||
-        (v.mux_playback_id ? muxThumbnail(v.mux_playback_id) : null) ||
-        `${APP_URL}/api/og-image`;
-      const title = v.series_title ? `${v.title} — ${v.series_title}` : v.title;
-      const slug = v.slug || id;
-      const url = `${APP_URL}${prefix}/${slug}`;
-      return c.html(await injectOG(await getSpaHtml(), {
-        title,
-        description: v.description || `Watch ${title} on ReelMotion`,
-        image,
-        url,
-      }));
-    } catch {
-      return c.html(await getSpaHtml());
-    }
-  });
+// Server-rendered preview page — no React/Clerk required, works in any browser
+function previewPage(opts: {
+  title: string;
+  description: string;
+  image: string;
+  ogUrl: string;
+  watchUrl: string;
+  signInUrl: string;
+  type: "movie" | "series";
+}): string {
+  const e = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${e(opts.title)} — ReelMotion</title>
+  <meta property="og:type" content="video.movie" />
+  <meta property="og:site_name" content="ReelMotion" />
+  <meta property="og:title" content="${e(opts.title)}" />
+  <meta property="og:description" content="${e(opts.description)}" />
+  <meta property="og:image" content="${opts.image}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:url" content="${opts.ogUrl}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${e(opts.title)}" />
+  <meta name="twitter:description" content="${e(opts.description)}" />
+  <meta name="twitter:image" content="${opts.image}" />
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center}
+    .hero{position:relative;width:100%;max-height:60vh;overflow:hidden}
+    .hero img{width:100%;height:100%;object-fit:cover;display:block;max-height:60vh}
+    .hero-overlay{position:absolute;inset:0;background:linear-gradient(to top,#000 0%,transparent 60%)}
+    .content{width:100%;max-width:480px;padding:24px 20px 48px;display:flex;flex-direction:column;gap:16px}
+    h1{font-size:1.75rem;font-weight:900;line-height:1.2}
+    .desc{color:rgba(255,255,255,0.6);font-size:.9rem;line-height:1.6}
+    .badge{display:inline-block;padding:4px 10px;background:rgba(255,255,255,0.08);border-radius:4px;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+    .actions{display:flex;flex-direction:column;gap:12px;margin-top:8px}
+    .btn{display:block;width:100%;padding:16px;text-align:center;font-weight:800;font-size:.95rem;letter-spacing:.05em;text-transform:uppercase;text-decoration:none;border-radius:4px}
+    .btn-primary{background:#E8001D;color:#fff}
+    .btn-secondary{background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.15)}
+    .logo{color:rgba(255,255,255,0.3);font-size:.75rem;text-align:center;margin-top:24px;letter-spacing:.1em}
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <img src="${opts.image}" alt="${e(opts.title)}" />
+    <div class="hero-overlay"></div>
+  </div>
+  <div class="content">
+    <span class="badge">${opts.type === "series" ? "Series" : "Film"}</span>
+    <h1>${e(opts.title)}</h1>
+    ${opts.description ? `<p class="desc">${e(opts.description)}</p>` : ""}
+    <div class="actions">
+      <a href="${opts.signInUrl}" class="btn btn-primary">Sign Up to Watch</a>
+      <a href="${opts.watchUrl}" class="btn btn-secondary">Already a Member? Watch Now</a>
+    </div>
+    <p class="logo">REELMOTION</p>
+  </div>
+</body>
+</html>`;
 }
+
+// /watch/:id — SPA with OG tags (user must be signed in; the SPA handles redirect)
+app.get("/watch/:id", async (c) => {
+  const id = c.req.param("id");
+  const isSlug = isNaN(Number(id));
+  try {
+    const result = await query(
+      `SELECT v.title, v.description, v.slug, v.thumbnail_url, v.hero_image_url,
+              v.carousel_image_url, v.mux_playback_id, s.title as series_title
+       FROM videos v LEFT JOIN series s ON v.series_id = s.id
+       WHERE ${isSlug ? "v.slug = $1" : "v.id = $1"}`,
+      [isSlug ? id : Number(id)]
+    );
+    if (!result.rows.length) return c.html(await getSpaHtml());
+    const v = result.rows[0] as any;
+    const image = v.hero_image_url || v.carousel_image_url || v.thumbnail_url ||
+      (v.mux_playback_id ? muxThumbnail(v.mux_playback_id) : null) ||
+      `${APP_URL}/api/og-image`;
+    const title = v.series_title ? `${v.title} — ${v.series_title}` : v.title;
+    const slug = v.slug || id;
+    return c.html(await injectOG(await getSpaHtml(), {
+      title,
+      description: v.description || `Watch ${title} on ReelMotion`,
+      image,
+      url: `${APP_URL}/watch/${slug}`,
+    }));
+  } catch {
+    return c.html(await getSpaHtml());
+  }
+});
+
+// /movie-info/:id — server-rendered preview page, no JS/Clerk required
+app.get("/movie-info/:id", async (c) => {
+  const id = c.req.param("id");
+  const isSlug = isNaN(Number(id));
+  try {
+    const result = await query(
+      `SELECT v.title, v.description, v.slug, v.thumbnail_url, v.hero_image_url,
+              v.carousel_image_url, v.mux_playback_id, s.title as series_title
+       FROM videos v LEFT JOIN series s ON v.series_id = s.id
+       WHERE ${isSlug ? "v.slug = $1" : "v.id = $1"}`,
+      [isSlug ? id : Number(id)]
+    );
+    if (!result.rows.length) return c.html(await getSpaHtml());
+    const v = result.rows[0] as any;
+    const image = v.hero_image_url || v.carousel_image_url || v.thumbnail_url ||
+      (v.mux_playback_id ? muxThumbnail(v.mux_playback_id) : null) ||
+      `${APP_URL}/api/og-image`;
+    const title = v.series_title ? `${v.title} — ${v.series_title}` : v.title;
+    const slug = v.slug || id;
+    const watchUrl = `${APP_URL}/watch/${slug}`;
+    return c.html(previewPage({
+      title,
+      description: v.description || "",
+      image,
+      ogUrl: `${APP_URL}/movie-info/${slug}`,
+      watchUrl,
+      signInUrl: `${APP_URL}/?next=${encodeURIComponent(`/watch/${slug}`)}`,
+      type: "movie",
+    }));
+  } catch {
+    return c.html(await getSpaHtml());
+  }
+});
 
 // /series/:id and /series-info/:id
 for (const prefix of ["/series", "/series-info"]) {
@@ -2525,12 +2621,24 @@ for (const prefix of ["/series", "/series-info"]) {
       const s = result.rows[0] as any;
       const image = s.cover_image_url || s.carousel_image_url || `${APP_URL}/api/og-image`;
       const slug = s.slug || id;
-      const url = `${APP_URL}${prefix}/${slug}`;
+      const ogUrl = `${APP_URL}${prefix}/${slug}`;
+      // series-info is the public share target — serve a preview page
+      if (prefix === "/series-info") {
+        return c.html(previewPage({
+          title: s.title,
+          description: s.description || "",
+          image,
+          ogUrl,
+          watchUrl: `${APP_URL}/series/${slug}`,
+          signInUrl: `${APP_URL}/?next=${encodeURIComponent(`/series/${slug}`)}`,
+          type: "series",
+        }));
+      }
       return c.html(await injectOG(await getSpaHtml(), {
         title: s.title,
         description: s.description || `Watch ${s.title} on ReelMotion`,
         image,
-        url,
+        url: ogUrl,
       }));
     } catch {
       return c.html(await getSpaHtml());
