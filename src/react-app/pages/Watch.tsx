@@ -298,7 +298,8 @@ export default function WatchPage() {
 
   const { video, nextEpisode } = watchData;
   const userHasAccess = hasAccess(subscription);
-  const canWatch = userHasAccess || video.is_free;
+  // Account required for all content; subscription required only for non-free content
+  const canWatch = isSignedIn && (userHasAccess || video.is_free);
   const isFutureRelease = !!(video.release_date && new Date(video.release_date) > new Date());
 
   return (
@@ -356,22 +357,30 @@ export default function WatchPage() {
                 <div className="p-4 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
                   <Lock className="w-10 h-10" style={{ color: '#E8001D' }} />
                 </div>
-                <h3 className="text-xl font-black">Members Only</h3>
-                <p className="text-sm max-w-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  Join the ReelMotion community to watch this film.
-                </p>
                 {!isSignedIn ? (
-                  <Link to="/">
-                    <div style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '12px 24px', display: 'inline-block' }}>
-                      <span className="font-extrabold text-sm tracking-[0.08em] uppercase" style={{ transform: 'skewX(6deg)', display: 'block' }}>Sign In to Watch</span>
-                    </div>
-                  </Link>
+                  <>
+                    <h3 className="text-xl font-black">Sign In to Watch</h3>
+                    <p className="text-sm max-w-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                      Create a free account to watch this{video.is_free ? " film" : " and more"}.
+                    </p>
+                    <Link to="/">
+                      <div style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '12px 24px', display: 'inline-block' }}>
+                        <span className="font-extrabold text-sm tracking-[0.08em] uppercase" style={{ transform: 'skewX(6deg)', display: 'block' }}>Create Account</span>
+                      </div>
+                    </Link>
+                  </>
                 ) : (
-                  <Link to="/subscribe">
-                    <div style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '12px 24px', display: 'inline-block' }}>
-                      <span className="font-extrabold text-sm tracking-[0.08em] uppercase" style={{ transform: 'skewX(6deg)', display: 'block' }}>Join the Community</span>
-                    </div>
-                  </Link>
+                  <>
+                    <h3 className="text-xl font-black">Members Only</h3>
+                    <p className="text-sm max-w-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                      Join the ReelMotion community to watch this film.
+                    </p>
+                    <Link to="/subscribe">
+                      <div style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '12px 24px', display: 'inline-block' }}>
+                        <span className="font-extrabold text-sm tracking-[0.08em] uppercase" style={{ transform: 'skewX(6deg)', display: 'block' }}>Join the Community</span>
+                      </div>
+                    </Link>
+                  </>
                 )}
               </div>
             </div>
