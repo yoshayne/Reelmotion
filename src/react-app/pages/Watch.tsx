@@ -266,8 +266,15 @@ export default function WatchPage() {
   );
 
   const handleShare = async () => {
-    const url = window.location.href;
-    const title = watchData?.video?.title ?? "Watch on ReelMotion";
+    // Share the public info page (no auth gate) rather than the watch URL
+    const video = watchData?.video;
+    const infoPath = video
+      ? video.series_id
+        ? `/series-info/${video.series_slug || video.series_id}`
+        : `/movie-info/${video.slug || video.id}`
+      : window.location.pathname;
+    const url = `${window.location.origin}${infoPath}`;
+    const title = video?.title ?? "Watch on ReelMotion";
     if (navigator.share) {
       try { await navigator.share({ title, url }); } catch {}
     } else {
