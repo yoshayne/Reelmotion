@@ -2534,7 +2534,6 @@ function previewPage(opts: {
     ${opts.description ? `<p class="desc">${e(opts.description)}</p>` : ""}
     <div class="actions">
       <a href="${opts.signInUrl}" class="btn btn-primary">Sign Up to Watch</a>
-      <a href="${opts.watchUrl}" class="btn btn-secondary">Already a Member? Watch Now</a>
     </div>
     <p class="logo">REELMOTION</p>
   </div>
