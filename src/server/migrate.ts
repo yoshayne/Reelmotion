@@ -360,31 +360,54 @@ export async function runMigrations() {
   await query(`CREATE INDEX IF NOT EXISTS idx_royalty_statements_period ON royalty_statements(period)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_royalty_statements_holder ON royalty_statements(rights_holder_id)`);
 
+  // Seed fake viewer accounts used for comment attribution
+  await query(`
+    INSERT INTO users (clerk_user_id, display_name, role) VALUES
+      ('seed_viewer_001', 'Nia T.',       'viewer'),
+      ('seed_viewer_002', 'Marcus B.',    'viewer'),
+      ('seed_viewer_003', 'Jade R.',      'viewer'),
+      ('seed_viewer_004', 'Dre Washington','viewer'),
+      ('seed_viewer_005', 'Simone K.',    'viewer'),
+      ('seed_viewer_006', 'TylerFromATL', 'viewer'),
+      ('seed_viewer_007', 'Camille M.',   'viewer'),
+      ('seed_viewer_008', 'Raheem J.',    'viewer'),
+      ('seed_viewer_009', 'Aaliyah C.',   'viewer')
+    ON CONFLICT (clerk_user_id) DO NOTHING
+  `);
+
   // Seed comments for "Last Night on Sunset" — runs once, skips if already present
   await query(`
     DO $$
     DECLARE
       v_video_id INTEGER;
-      v_user_id  INTEGER;
+      u1 INTEGER; u2 INTEGER; u3 INTEGER; u4 INTEGER; u5 INTEGER;
+      u6 INTEGER; u7 INTEGER; u8 INTEGER; u9 INTEGER;
     BEGIN
       SELECT id INTO v_video_id FROM videos
         WHERE title ILIKE '%Last Night on Sunset%' LIMIT 1;
-      SELECT id INTO v_user_id FROM users
-        WHERE email ILIKE '%creativedirectorshayne@gmail.com%' LIMIT 1;
 
-      IF v_video_id IS NOT NULL AND v_user_id IS NOT NULL THEN
-        -- Only seed if no comments exist yet for this video
+      SELECT id INTO u1 FROM users WHERE clerk_user_id = 'seed_viewer_001';
+      SELECT id INTO u2 FROM users WHERE clerk_user_id = 'seed_viewer_002';
+      SELECT id INTO u3 FROM users WHERE clerk_user_id = 'seed_viewer_003';
+      SELECT id INTO u4 FROM users WHERE clerk_user_id = 'seed_viewer_004';
+      SELECT id INTO u5 FROM users WHERE clerk_user_id = 'seed_viewer_005';
+      SELECT id INTO u6 FROM users WHERE clerk_user_id = 'seed_viewer_006';
+      SELECT id INTO u7 FROM users WHERE clerk_user_id = 'seed_viewer_007';
+      SELECT id INTO u8 FROM users WHERE clerk_user_id = 'seed_viewer_008';
+      SELECT id INTO u9 FROM users WHERE clerk_user_id = 'seed_viewer_009';
+
+      IF v_video_id IS NOT NULL THEN
         IF (SELECT COUNT(*) FROM comments WHERE video_id = v_video_id) = 0 THEN
           INSERT INTO comments (video_id, user_id, body, created_at) VALUES
-            (v_video_id, v_user_id, 'I can''t believe it ended that way. I was NOT prepared for that last scene at all.', NOW() - INTERVAL '2 days'),
-            (v_video_id, v_user_id, 'This needs a part two. Like yesterday. They cannot leave it there.', NOW() - INTERVAL '2 days' + INTERVAL '10 minutes'),
-            (v_video_id, v_user_id, 'Great movie. One of the best things I''ve watched in a long time honestly.', NOW() - INTERVAL '1 day' + INTERVAL '3 hours'),
-            (v_video_id, v_user_id, 'Watched this twice already. The ending hits different the second time around.', NOW() - INTERVAL '1 day' + INTERVAL '5 hours'),
-            (v_video_id, v_user_id, 'The way they wrapped up that storyline though 😭 I have so many questions', NOW() - INTERVAL '1 day' + INTERVAL '7 hours'),
-            (v_video_id, v_user_id, 'Part 2 needs to happen. The story isn''t finished, you can feel it.', NOW() - INTERVAL '20 hours'),
-            (v_video_id, v_user_id, 'This is exactly the kind of content I joined ReelMotion for. Please make more like this.', NOW() - INTERVAL '15 hours'),
-            (v_video_id, v_user_id, 'Showed this to my sister and she''s been texting me about the ending for two days straight lol', NOW() - INTERVAL '10 hours'),
-            (v_video_id, v_user_id, 'That twist at the end 🤯 I had to rewind it like three times to make sure I saw what I thought I saw', NOW() - INTERVAL '4 hours');
+            (v_video_id, u1, 'I can''t believe it ended that way. I was NOT prepared for that last scene at all.', NOW() - INTERVAL '2 days'),
+            (v_video_id, u2, 'This needs a part two. Like yesterday. They cannot leave it there.', NOW() - INTERVAL '2 days' + INTERVAL '10 minutes'),
+            (v_video_id, u3, 'Great movie. One of the best things I''ve watched in a long time honestly.', NOW() - INTERVAL '1 day' + INTERVAL '3 hours'),
+            (v_video_id, u4, 'Watched this twice already. The ending hits different the second time around.', NOW() - INTERVAL '1 day' + INTERVAL '5 hours'),
+            (v_video_id, u5, 'The way they wrapped up that storyline though 😭 I have so many questions', NOW() - INTERVAL '1 day' + INTERVAL '7 hours'),
+            (v_video_id, u6, 'Part 2 needs to happen. The story isn''t finished, you can feel it.', NOW() - INTERVAL '20 hours'),
+            (v_video_id, u7, 'This is exactly the kind of content I joined ReelMotion for. Please make more like this.', NOW() - INTERVAL '15 hours'),
+            (v_video_id, u8, 'Showed this to my sister and she''s been texting me about the ending for two days straight lol', NOW() - INTERVAL '10 hours'),
+            (v_video_id, u9, 'That twist at the end 🤯 I had to rewind it like three times to make sure I saw what I thought I saw', NOW() - INTERVAL '4 hours');
         END IF;
       END IF;
     END $$;
