@@ -360,5 +360,35 @@ export async function runMigrations() {
   await query(`CREATE INDEX IF NOT EXISTS idx_royalty_statements_period ON royalty_statements(period)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_royalty_statements_holder ON royalty_statements(rights_holder_id)`);
 
+  // Seed comments for "Last Night on Sunset" — runs once, skips if already present
+  await query(`
+    DO $$
+    DECLARE
+      v_video_id INTEGER;
+      v_user_id  INTEGER;
+    BEGIN
+      SELECT id INTO v_video_id FROM videos
+        WHERE title ILIKE '%Last Night on Sunset%' LIMIT 1;
+      SELECT id INTO v_user_id FROM users
+        WHERE email ILIKE '%creativedirectorshayne@gmail.com%' LIMIT 1;
+
+      IF v_video_id IS NOT NULL AND v_user_id IS NOT NULL THEN
+        -- Only seed if no comments exist yet for this video
+        IF (SELECT COUNT(*) FROM comments WHERE video_id = v_video_id) = 0 THEN
+          INSERT INTO comments (video_id, user_id, body, created_at) VALUES
+            (v_video_id, v_user_id, 'I can''t believe it ended that way. I was NOT prepared for that last scene at all.', NOW() - INTERVAL '2 days'),
+            (v_video_id, v_user_id, 'This needs a part two. Like yesterday. They cannot leave it there.', NOW() - INTERVAL '2 days' + INTERVAL '10 minutes'),
+            (v_video_id, v_user_id, 'Great movie. One of the best things I''ve watched in a long time honestly.', NOW() - INTERVAL '1 day' + INTERVAL '3 hours'),
+            (v_video_id, v_user_id, 'Watched this twice already. The ending hits different the second time around.', NOW() - INTERVAL '1 day' + INTERVAL '5 hours'),
+            (v_video_id, v_user_id, 'The way they wrapped up that storyline though 😭 I have so many questions', NOW() - INTERVAL '1 day' + INTERVAL '7 hours'),
+            (v_video_id, v_user_id, 'Part 2 needs to happen. The story isn''t finished, you can feel it.', NOW() - INTERVAL '20 hours'),
+            (v_video_id, v_user_id, 'This is exactly the kind of content I joined ReelMotion for. Please make more like this.', NOW() - INTERVAL '15 hours'),
+            (v_video_id, v_user_id, 'Showed this to my sister and she''s been texting me about the ending for two days straight lol', NOW() - INTERVAL '10 hours'),
+            (v_video_id, v_user_id, 'That twist at the end 🤯 I had to rewind it like three times to make sure I saw what I thought I saw', NOW() - INTERVAL '4 hours');
+        END IF;
+      END IF;
+    END $$;
+  `);
+
   console.log("DB migrations complete.");
 }
