@@ -620,7 +620,7 @@ app.get("/api/public/cover-art", async (c) => {
 });
 
 app.get("/api/promo-popup", async (c) => {
-  const data = await getCached("promo-popup", 3300, async () => {
+  const data = await getCached("promo-popup", 30, async () => {
     const result = await query(
       `SELECT *, COALESCE(frequency, 'once_per_day') as frequency FROM promo_popups
        WHERE is_active = true
