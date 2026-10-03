@@ -305,8 +305,8 @@ export default function ActingClasses() {
 
   useEffect(() => {
     fetch("/api/classes")
-      .then(r => r.json() as Promise<PackageWithDates[]>)
-      .then(setPackages)
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setPackages(data); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

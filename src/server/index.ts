@@ -2674,24 +2674,17 @@ for (const prefix of ["/series", "/series-info"]) {
 // ─── Acting Classes (Public) ─────────────────────────────────────────────────
 
 app.get("/api/classes", async (c) => {
-  const packages = await query(`
-    SELECT p.*,
-      COALESCE(
-        json_agg(
-          json_build_object(
-            'id', d.id, 'date', d.date, 'time', d.time,
-            'capacity', d.capacity, 'spots_remaining', d.spots_remaining
-          ) ORDER BY d.date
-        ) FILTER (WHERE d.id IS NOT NULL AND d.is_active = true AND d.date >= CURRENT_DATE),
-        '[]'
-      ) AS dates
-    FROM acting_class_packages p
-    LEFT JOIN acting_class_dates d ON d.package_id = p.id
-    WHERE p.is_active = true
-    GROUP BY p.id
-    ORDER BY p.sort_order
-  `);
-  return c.json(packages.rows);
+  const [pkgResult, dateResult] = await Promise.all([
+    query(`SELECT * FROM acting_class_packages WHERE is_active = true ORDER BY sort_order, id`),
+    query(`SELECT * FROM acting_class_dates WHERE is_active = true AND date >= CURRENT_DATE ORDER BY date`),
+  ]);
+  const datesByPackage: Record<number, typeof dateResult.rows> = {};
+  for (const d of dateResult.rows) {
+    if (!datesByPackage[d.package_id]) datesByPackage[d.package_id] = [];
+    datesByPackage[d.package_id].push(d);
+  }
+  const result = pkgResult.rows.map(p => ({ ...p, dates: datesByPackage[p.id] ?? [] }));
+  return c.json(result);
 });
 
 app.post("/api/classes/checkout", async (c) => {
