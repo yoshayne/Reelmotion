@@ -391,9 +391,21 @@ export async function runMigrations() {
   `);
 
   await query(`
+    CREATE TABLE IF NOT EXISTS acting_class_sessions (
+      id SERIAL PRIMARY KEY,
+      date DATE NOT NULL UNIQUE,
+      total_capacity INTEGER NOT NULL DEFAULT 15,
+      spots_remaining INTEGER NOT NULL DEFAULT 15,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await query(`
     CREATE TABLE IF NOT EXISTS acting_class_dates (
       id SERIAL PRIMARY KEY,
       package_id INTEGER NOT NULL REFERENCES acting_class_packages(id) ON DELETE CASCADE,
+      session_id INTEGER REFERENCES acting_class_sessions(id),
       date DATE NOT NULL,
       time TEXT NOT NULL DEFAULT '2:00 PM',
       capacity INTEGER NOT NULL DEFAULT 12,
@@ -403,6 +415,8 @@ export async function runMigrations() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+
+  await query(`ALTER TABLE acting_class_dates ADD COLUMN IF NOT EXISTS session_id INTEGER REFERENCES acting_class_sessions(id)`).catch(() => {});
 
   await query(`
     CREATE TABLE IF NOT EXISTS acting_class_registrations (

@@ -133,10 +133,10 @@ function PackagesTab() {
 function DatesTab() {
   const [dates, setDates] = useState<ActingClassDate[]>([]);
   const [packages, setPackages] = useState<ActingClassPackage[]>([]);
-  const [form, setForm] = useState({ package_id: 0, date: "", time: "2:00 PM", capacity: 12 });
+  const [form, setForm] = useState({ package_id: 0, date: "", time: "2:00 PM", capacity: 12, session_capacity: 15 });
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState<{ package_id: number; date: string; time: string; capacity: number }>({ package_id: 0, date: "", time: "", capacity: 0 });
+  const [editForm, setEditForm] = useState<{ package_id: number; date: string; time: string; capacity: number; session_capacity: number }>({ package_id: 0, date: "", time: "", capacity: 0, session_capacity: 15 });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -176,20 +176,32 @@ function DatesTab() {
 
   const startEdit = (d: ActingClassDate) => {
     setEditingId(d.id);
-    setEditForm({ package_id: d.package_id, date: d.date.slice(0, 10), time: d.time, capacity: d.capacity });
+    setEditForm({ package_id: d.package_id, date: d.date.slice(0, 10), time: d.time, capacity: d.capacity, session_capacity: d.session_total_capacity ?? 15 });
   };
 
   const saveEdit = async () => {
     if (!editingId) return;
     setSaving(true);
     try {
+      const target = dates.find(d => d.id === editingId);
+      // Update session capacity if changed and session exists
+      if (target?.session_id && editForm.session_capacity !== target.session_total_capacity) {
+        await apiFetch(`/api/admin/classes/sessions/${target.session_id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ total_capacity: editForm.session_capacity }),
+        });
+      }
+      const { session_capacity: _, ...dateFields } = editForm;
       const res = await apiFetch(`/api/admin/classes/dates/${editingId}`, {
         method: "PATCH",
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(dateFields),
       });
       const updated = await res.json() as ActingClassDate;
       const pkg = packages.find(p => p.id === updated.package_id);
-      setDates(prev => prev.map(d => d.id === editingId ? { ...d, ...updated, package_name: pkg?.name ?? d.package_name } : d));
+      setDates(prev => prev.map(d => d.id === editingId
+        ? { ...d, ...updated, package_name: pkg?.name ?? d.package_name, session_total_capacity: editForm.session_capacity }
+        : d
+      ));
       setEditingId(null);
     } finally {
       setSaving(false);
@@ -245,12 +257,22 @@ function DatesTab() {
             />
           </div>
           <div>
-            <label className="text-xs text-zinc-500 mb-1 block">Capacity</label>
+            <label className="text-xs text-zinc-500 mb-1 block">Per-slot capacity</label>
             <input
               type="number"
               min={1}
               value={form.capacity}
               onChange={e => setForm(f => ({ ...f, capacity: Number(e.target.value) }))}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E8001D]"
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="text-xs text-zinc-500 mb-1 block">Shared day capacity <span className="text-zinc-600">(total slots for this Saturday across all packages)</span></label>
+            <input
+              type="number"
+              min={1}
+              value={form.session_capacity}
+              onChange={e => setForm(f => ({ ...f, session_capacity: Number(e.target.value) }))}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E8001D]"
             />
           </div>
@@ -304,12 +326,22 @@ function DatesTab() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-zinc-500 mb-1 block">Capacity</label>
+                        <label className="text-xs text-zinc-500 mb-1 block">Per-slot capacity</label>
                         <input
                           type="number"
                           min={1}
                           value={editForm.capacity}
                           onChange={e => setEditForm(f => ({ ...f, capacity: Number(e.target.value) }))}
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E8001D]"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-xs text-zinc-500 mb-1 block">Shared day slots <span className="text-zinc-600">(all packages combined)</span></label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={editForm.session_capacity}
+                          onChange={e => setEditForm(f => ({ ...f, session_capacity: Number(e.target.value) }))}
                           className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E8001D]"
                         />
                       </div>
@@ -333,7 +365,12 @@ function DatesTab() {
                     <div>
                       <div className="text-sm font-semibold">{d.package_name}</div>
                       <div className="text-xs text-zinc-400">{formatDate(d.date)} · {d.time}</div>
-                      <div className="text-xs text-zinc-500 mt-0.5">{d.spots_remaining}/{d.capacity} spots remaining</div>
+                      <div className="text-xs text-zinc-500 mt-0.5">
+                        {d.session_spots_remaining != null
+                          ? <><span className="text-amber-400 font-medium">{d.session_spots_remaining}/{d.session_total_capacity}</span> shared day slots</>
+                          : <>{d.spots_remaining}/{d.capacity} spots</>
+                        }
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <button onClick={() => toggleActive(d)} className={`text-xs px-2 py-1 rounded-lg font-medium ${d.is_active ? "bg-green-900/40 text-green-400" : "bg-zinc-800 text-zinc-500"}`}>

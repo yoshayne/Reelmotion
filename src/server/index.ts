@@ -278,6 +278,14 @@ app.post("/api/billing/stripe-webhook", async (c) => {
              WHERE stripe_session_id = $3`,
             [custEmail, custName, session.id]
           );
+          // Decrement shared session pool (primary) and individual date as fallback
+          await query(
+            `UPDATE acting_class_sessions s
+             SET spots_remaining = GREATEST(s.spots_remaining - 1, 0), updated_at = NOW()
+             FROM acting_class_dates d
+             WHERE d.id = $1 AND d.session_id = s.id`,
+            [dateId]
+          );
           await query(
             `UPDATE acting_class_dates SET spots_remaining = GREATEST(spots_remaining - 1, 0)
              WHERE id = $1`,
@@ -2676,7 +2684,15 @@ for (const prefix of ["/series", "/series-info"]) {
 app.get("/api/classes", async (c) => {
   const [pkgResult, dateResult] = await Promise.all([
     query(`SELECT * FROM acting_class_packages WHERE is_active = true ORDER BY sort_order, id`),
-    query(`SELECT * FROM acting_class_dates WHERE is_active = true AND date >= CURRENT_DATE ORDER BY date`),
+    query(`
+      SELECT d.*, p.name AS package_name, p.price_cents, p.stripe_price_id,
+             s.spots_remaining AS session_spots_remaining, s.total_capacity AS session_total_capacity
+      FROM acting_class_dates d
+      JOIN acting_class_packages p ON p.id = d.package_id
+      LEFT JOIN acting_class_sessions s ON s.id = d.session_id
+      WHERE d.is_active = true AND d.date >= CURRENT_DATE
+      ORDER BY d.date
+    `),
   ]);
   const datesByPackage: Record<number, typeof dateResult.rows> = {};
   for (const d of dateResult.rows) {
@@ -2690,7 +2706,7 @@ app.get("/api/classes", async (c) => {
 app.post("/api/classes/checkout", async (c) => {
   const body = await c.req.json<{ date_id: number; customer_name?: string; customer_email?: string }>();
   const dateRow = await query<{
-    id: number; date: string; time: string; spots_remaining: number;
+    id: number; date: string; time: string; spots_remaining: number; session_id: number | null;
     package_id: number; stripe_price_id: string | null; name: string; price_cents: number;
   }>(
     `SELECT d.*, p.stripe_price_id, p.name, p.price_cents
@@ -2700,8 +2716,20 @@ app.post("/api/classes/checkout", async (c) => {
   );
   const slot = dateRow.rows[0];
   if (!slot) return c.json({ error: "Date not found or unavailable" }, 404);
-  if (slot.spots_remaining <= 0) return c.json({ error: "This session is full" }, 409);
   if (!slot.stripe_price_id) return c.json({ error: "Registration not yet available for this package" }, 503);
+
+  // Check shared session capacity (with row lock to prevent race conditions)
+  if (slot.session_id) {
+    const sessionCheck = await query(
+      `SELECT spots_remaining FROM acting_class_sessions WHERE id = $1 FOR UPDATE`,
+      [slot.session_id]
+    );
+    if (!sessionCheck.rows[0] || sessionCheck.rows[0].spots_remaining <= 0) {
+      return c.json({ error: "This day is fully booked" }, 409);
+    }
+  } else if (slot.spots_remaining <= 0) {
+    return c.json({ error: "This session is full" }, 409);
+  }
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
@@ -2820,22 +2848,55 @@ app.delete("/api/admin/classes/packages/:id", clerkAuth, adminAuth, async (c) =>
 
 app.get("/api/admin/classes/dates", clerkAuth, adminAuth, async (c) => {
   const result = await query(`
-    SELECT d.*, p.name AS package_name, p.price_cents, p.stripe_price_id
-    FROM acting_class_dates d JOIN acting_class_packages p ON p.id = d.package_id
+    SELECT d.*, p.name AS package_name, p.price_cents, p.stripe_price_id,
+           s.spots_remaining AS session_spots_remaining, s.total_capacity AS session_total_capacity, s.id AS session_id
+    FROM acting_class_dates d
+    JOIN acting_class_packages p ON p.id = d.package_id
+    LEFT JOIN acting_class_sessions s ON s.id = d.session_id
     ORDER BY d.date DESC, p.sort_order
   `);
   return c.json(result.rows);
 });
 
 app.post("/api/admin/classes/dates", clerkAuth, adminAuth, async (c) => {
-  const b = await c.req.json<{ package_id: number; date: string; time?: string; capacity?: number }>();
+  const b = await c.req.json<{ package_id: number; date: string; time?: string; capacity?: number; session_capacity?: number }>();
   const cap = b.capacity ?? 12;
-  const result = await query(
-    `INSERT INTO acting_class_dates (package_id, date, time, capacity, spots_remaining)
-     VALUES ($1, $2, $3, $4, $4) RETURNING *`,
-    [b.package_id, b.date, b.time ?? "2:00 PM", cap]
+  const sessionCap = b.session_capacity ?? 15;
+
+  // Upsert a shared session for this date
+  const sessionRes = await query(
+    `INSERT INTO acting_class_sessions (date, total_capacity, spots_remaining)
+     VALUES ($1, $2, $2)
+     ON CONFLICT (date) DO UPDATE SET updated_at = NOW()
+     RETURNING *`,
+    [b.date, sessionCap]
   );
-  return c.json(result.rows[0], 201);
+  const session = sessionRes.rows[0];
+
+  const result = await query(
+    `INSERT INTO acting_class_dates (package_id, session_id, date, time, capacity, spots_remaining)
+     VALUES ($1, $2, $3, $4, $5, $5) RETURNING *`,
+    [b.package_id, session.id, b.date, b.time ?? "2:00 PM", cap]
+  );
+  return c.json({ ...result.rows[0], session_spots_remaining: session.spots_remaining, session_total_capacity: session.total_capacity }, 201);
+});
+
+app.patch("/api/admin/classes/sessions/:id", clerkAuth, adminAuth, async (c) => {
+  const id = Number(c.req.param("id"));
+  const b = await c.req.json<{ total_capacity?: number }>();
+  if (b.total_capacity !== undefined) {
+    const diff = b.total_capacity;
+    await query(
+      `UPDATE acting_class_sessions
+       SET total_capacity = $1,
+           spots_remaining = GREATEST(0, spots_remaining + ($1 - total_capacity)),
+           updated_at = NOW()
+       WHERE id = $2`,
+      [diff, id]
+    );
+  }
+  const res = await query(`SELECT * FROM acting_class_sessions WHERE id = $1`, [id]);
+  return c.json(res.rows[0]);
 });
 
 app.patch("/api/admin/classes/dates/:id", clerkAuth, adminAuth, async (c) => {

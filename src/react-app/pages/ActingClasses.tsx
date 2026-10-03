@@ -75,8 +75,9 @@ function formatPrice(cents: number) {
 
 function DateRow({ slot, pkg }: { slot: ActingClassDate; pkg: PackageWithDates }) {
   const [loading, setLoading] = useState(false);
-  const full = slot.spots_remaining <= 0;
-  const low = slot.spots_remaining > 0 && slot.spots_remaining <= 3;
+  const sharedRemaining = slot.session_spots_remaining ?? slot.spots_remaining;
+  const full = sharedRemaining <= 0;
+  const low = sharedRemaining > 0 && sharedRemaining <= 3;
   const canRegister = !full && !!pkg.stripe_price_id;
 
   const handleClick = async () => {
@@ -106,8 +107,10 @@ function DateRow({ slot, pkg }: { slot: ActingClassDate; pkg: PackageWithDates }
         {full ? (
           <div className="text-xs text-red-400 mt-0.5 font-medium">Sold out</div>
         ) : low ? (
-          <div className="text-xs text-amber-400 mt-0.5 font-medium">{slot.spots_remaining} spot{slot.spots_remaining !== 1 ? "s" : ""} left</div>
-        ) : null}
+          <div className="text-xs text-amber-400 mt-0.5 font-medium">{sharedRemaining} spot{sharedRemaining !== 1 ? "s" : ""} left</div>
+        ) : (
+          <div className="text-xs text-white/30 mt-0.5">{sharedRemaining} spots available</div>
+        )}
       </div>
       <button
         onClick={handleClick}

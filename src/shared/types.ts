@@ -196,10 +196,13 @@ export interface ActingClassPackage {
 export interface ActingClassDate {
   id: number;
   package_id: number;
+  session_id: number | null;
   date: string;
   time: string;
   capacity: number;
   spots_remaining: number;
+  session_spots_remaining: number | null;
+  session_total_capacity: number | null;
   is_active: boolean;
   created_at: string;
   // joined
