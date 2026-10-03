@@ -285,6 +285,64 @@ export async function notifyAdminCancellation(userEmail: string): Promise<void> 
   `));
 }
 
+// ─── Acting Class emails ──────────────────────────────────────────────────────
+
+export async function sendClassRegistrationConfirmation(
+  to: string,
+  name: string,
+  packageName: string,
+  classDate: string,
+  classTime: string,
+  pricePaid: string,
+): Promise<void> {
+  const firstName = name?.split(" ")[0] || "there";
+  await send(to, `You're registered — ${packageName}`, layout(`
+    <div class="card">
+      <div class="badge" style="background:rgba(6,182,212,0.12);color:#22d3ee;border-color:rgba(6,182,212,0.3);">REGISTRATION CONFIRMED</div>
+      <h1>You're in, ${firstName}.</h1>
+      <p>Your spot is confirmed for <strong>${packageName}</strong>. We can't wait to work with you.</p>
+      <div class="row"><span class="label">Class</span><span>${packageName}</span></div>
+      <div class="row"><span class="label">Date</span><span>${classDate}</span></div>
+      <div class="row"><span class="label">Time</span><span>${classTime}</span></div>
+      <div class="row"><span class="label">Amount paid</span><span>${pricePaid}</span></div>
+      <br/>
+      <p><strong>What to bring:</strong></p>
+      <p>Come prepared with an audition side (monologue or scene) if you have one — we'll provide one if not. Wear solid, neutral colors. No busy patterns.</p>
+      <p>Questions or need to reschedule? Reply to this email or DM us directly.</p>
+      <a class="btn" href="${APP_URL}/classes">View Classes</a>
+    </div>
+    <div class="card">
+      <h1 style="font-size:16px;">The Self-Tape Room</h1>
+      <p>Real skills. Real practice. Real opportunities.</p>
+      <p class="small">TRAIN · RECORD · IMPROVE · REPEAT</p>
+    </div>
+  `));
+}
+
+export async function notifyAdminClassRegistration(
+  customerEmail: string,
+  customerName: string,
+  packageName: string,
+  classDate: string,
+  classTime: string,
+  pricePaid: string,
+): Promise<void> {
+  await send(ADMIN_EMAIL, `New class registration: ${customerName || customerEmail} — ${packageName}`, layout(`
+    <div class="card">
+      <div class="badge" style="background:rgba(6,182,212,0.12);color:#22d3ee;border-color:rgba(6,182,212,0.3);">NEW REGISTRATION</div>
+      <h1>Someone just booked a class</h1>
+      <div class="row"><span class="label">Name</span><span>${customerName || "—"}</span></div>
+      <div class="row"><span class="label">Email</span><span>${customerEmail}</span></div>
+      <div class="row"><span class="label">Package</span><span>${packageName}</span></div>
+      <div class="row"><span class="label">Date</span><span>${classDate}</span></div>
+      <div class="row"><span class="label">Time</span><span>${classTime}</span></div>
+      <div class="row"><span class="label">Amount</span><span>${pricePaid}</span></div>
+      <br/>
+      <a class="btn" href="${APP_URL}/admin/acting-classes">View Registrations</a>
+    </div>
+  `));
+}
+
 export async function notifyAdminContestEntry(
   submitterEmail: string,
   submitterName: string

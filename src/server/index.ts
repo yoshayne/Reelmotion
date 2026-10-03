@@ -16,6 +16,17 @@ import { Webhook } from "svix";
 import { query, pool } from "./db.js";
 import { containsBlockedContent } from "./commentFilter.js";
 import { clerkAuth, adminAuth, clerk } from "./auth.js";
+import {
+  sendClassRegistrationConfirmation,
+  notifyAdminClassRegistration,
+  sendSubscriptionConfirmationEmail,
+  sendPaymentReceiptEmail,
+  sendPaymentFailedEmail,
+  sendCancellationEmail,
+  notifyAdminNewSubscription,
+  notifyAdminPaymentFailed,
+  notifyAdminCancellation,
+} from "./email.js";
 
 // Rewrite private storage URLs → /api/images/:key proxy so browser can load them.
 // Matches any S3-style URL: https://host/bucket/key → /api/images/key
@@ -291,6 +302,36 @@ app.post("/api/billing/stripe-webhook", async (c) => {
              WHERE id = $1`,
             [dateId]
           );
+
+          // Fetch full registration details for emails
+          const regDetails = await query<{
+            customer_email: string; customer_name: string | null;
+            package_name: string; class_date: string; class_time: string; price_cents: number;
+          }>(
+            `SELECT r.customer_email, r.customer_name, p.name AS package_name,
+                    d.date AS class_date, d.time AS class_time, p.price_cents
+             FROM acting_class_registrations r
+             JOIN acting_class_dates d ON d.id = r.date_id
+             JOIN acting_class_packages p ON p.id = d.package_id
+             WHERE r.stripe_session_id = $1`,
+            [session.id]
+          );
+          if (regDetails.rows[0]) {
+            const reg = regDetails.rows[0];
+            const dateStr = new Date(reg.class_date.slice(0, 10) + "T12:00:00")
+              .toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+            const price = `$${(reg.price_cents / 100).toFixed(2)}`;
+            await Promise.all([
+              sendClassRegistrationConfirmation(
+                reg.customer_email, reg.customer_name ?? "", reg.package_name,
+                dateStr, reg.class_time, price
+              ),
+              notifyAdminClassRegistration(
+                reg.customer_email, reg.customer_name ?? "", reg.package_name,
+                dateStr, reg.class_time, price
+              ),
+            ]);
+          }
           break;
         }
 
