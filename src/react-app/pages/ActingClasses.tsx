@@ -117,13 +117,11 @@ function DateCard({ slot, pkg, onRegister }: { slot: ActingClassDate; pkg: Packa
 
 function PackageCard({ pkg }: { pkg: PackageWithDates }) {
   const [open, setOpen] = useState(false);
-  const [registering, setRegistering] = useState(false);
   const detail = PACKAGE_DETAILS[pkg.name] ?? {};
   const Icon = PACKAGE_ICONS[pkg.name] ?? Camera;
   const upcomingDates = pkg.dates.filter(d => d.is_active);
 
   const handleRegister = async (dateId: number) => {
-    setRegistering(true);
     try {
       const res = await fetch("/api/classes/checkout", {
         method: "POST",
@@ -135,8 +133,6 @@ function PackageCard({ pkg }: { pkg: PackageWithDates }) {
       else alert(data.error ?? "Unable to start checkout. Please try again.");
     } catch {
       alert("Something went wrong. Please try again.");
-    } finally {
-      setRegistering(false);
     }
   };
 

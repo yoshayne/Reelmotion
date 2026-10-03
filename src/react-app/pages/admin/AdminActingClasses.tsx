@@ -10,10 +10,6 @@ type Tab = "packages" | "dates" | "registrations" | "waitlist";
 function formatDate(d: string) {
   return new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 }
-function formatPrice(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
 // ─── Packages Tab ─────────────────────────────────────────────────────────────
 
 function PackagesTab() {
