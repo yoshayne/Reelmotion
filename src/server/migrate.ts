@@ -464,46 +464,24 @@ export async function runMigrations() {
     )
   `);
 
-  // Ensure unique constraint exists on package name
-  await query(`ALTER TABLE acting_class_packages ADD CONSTRAINT acting_class_packages_name_key UNIQUE (name)`).catch(() => {});
+  // Seed the 5 base packages (ON CONFLICT by name keeps existing data intact)
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS acting_class_packages_name_idx ON acting_class_packages(name)
+  `).catch(() => {});
 
-  // Upsert the 5 base packages with full descriptions — updates name/description/sort on conflict, preserves price and stripe_price_id
   const packages = [
-    {
-      name: 'Self-Tape Audition Workshop',
-      description: 'Learn the fundamentals of auditioning on camera and creating stronger self-tapes. Includes breaking down sides, character choices, camera positioning, framing, eyelines, lighting basics, sound, slate technique, and live audition exercises with instructor feedback.',
-      price: 5000, sort: 1,
-    },
-    {
-      name: 'Workshop + Professional Self-Tape',
-      description: 'Everything in the workshop, plus a professionally recorded self-tape. Includes scene preparation, on-camera performance, professional camera setup, lighting, audio, multiple takes, and your final self-tape recording.',
-      price: 7500, sort: 2,
-    },
-    {
-      name: 'Actor Starter Package',
-      description: 'TRAIN. RECORD. GET CAMERA READY. A complete starter package: the full workshop, a professional self-tape recording, and 3 professionally captured and edited headshots. You leave with training, a self-tape, and 3 headshots — all in one session.',
-      price: 10000, sort: 3,
-    },
-    {
-      name: '1-on-1 Premium Self-Tape Session',
-      description: 'A private session built around your specific audition. Includes audition preparation, script/side breakdown, character development, performance coaching, camera positioning, lighting, professional recording, multiple takes, performance feedback, and your final self-tape.',
-      price: 12500, sort: 4,
-    },
-    {
-      name: 'The Casting Room',
-      description: 'STEP INTO THE ROOM. A recurring mock-casting experience. You receive audition sides, prepare your scene, walk into the casting room, perform on camera, and receive feedback — a realistic audition experience from start to finish.',
-      price: 3500, sort: 5,
-    },
+    { name: 'Self-Tape Audition Workshop',       price: 5000, sort: 1 },
+    { name: 'Workshop + Professional Self-Tape', price: 7500, sort: 2 },
+    { name: 'Actor Starter Package',             price: 10000, sort: 3 },
+    { name: '1-on-1 Premium Self-Tape Session',  price: 12500, sort: 4 },
+    { name: 'The Casting Room',                  price: 3500,  sort: 5 },
   ];
   for (const p of packages) {
     await query(
-      `INSERT INTO acting_class_packages (name, description, price_cents, sort_order)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (name) DO UPDATE SET
-         description = EXCLUDED.description,
-         sort_order = EXCLUDED.sort_order,
-         updated_at = NOW()`,
-      [p.name, p.description, p.price, p.sort]
+      `INSERT INTO acting_class_packages (name, price_cents, sort_order)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (name) DO NOTHING`,
+      [p.name, p.price, p.sort]
     );
   }
 
