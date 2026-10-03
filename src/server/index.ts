@@ -2768,6 +2768,43 @@ app.post("/api/admin/classes/packages", clerkAuth, adminAuth, async (c) => {
 app.patch("/api/admin/classes/packages/:id", clerkAuth, adminAuth, async (c) => {
   const id = Number(c.req.param("id"));
   const b = await c.req.json<Record<string, unknown>>();
+
+  // Fetch the current package so we can compare price and name
+  const current = await query<{ price_cents: number; stripe_price_id: string | null; name: string }>(
+    `SELECT price_cents, stripe_price_id, name FROM acting_class_packages WHERE id = $1`, [id]
+  );
+  if (!current.rows[0]) return c.json({ error: "Not found" }, 404);
+
+  const newPriceCents = (b.price_cents as number | undefined) ?? current.rows[0].price_cents;
+  const newName = (b.name as string | undefined) ?? current.rows[0].name;
+  const priceChanged = typeof b.price_cents === "number" && b.price_cents !== current.rows[0].price_cents;
+  const explicitPriceId = typeof b.stripe_price_id === "string" ? b.stripe_price_id : null;
+
+  // Auto-generate a Stripe Price whenever: no price ID yet, price changed, or caller didn't supply one
+  let stripePriceId = explicitPriceId ?? current.rows[0].stripe_price_id;
+  if (!stripePriceId || priceChanged) {
+    try {
+      // Create or reuse a Stripe Product named after the package
+      const products = await stripe.products.search({ query: `name:"${newName.replace(/"/g, "")}"`, limit: 1 });
+      let productId: string;
+      if (products.data.length > 0) {
+        productId = products.data[0].id;
+      } else {
+        const product = await stripe.products.create({ name: newName });
+        productId = product.id;
+      }
+      const price = await stripe.prices.create({
+        product: productId,
+        unit_amount: newPriceCents,
+        currency: "usd",
+      });
+      stripePriceId = price.id;
+    } catch (err) {
+      console.error("Stripe price creation error:", err);
+      // Don't fail the save — admin can retry
+    }
+  }
+
   const result = await query(
     `UPDATE acting_class_packages SET
        name = COALESCE($1, name),
@@ -2778,9 +2815,8 @@ app.patch("/api/admin/classes/packages/:id", clerkAuth, adminAuth, async (c) => 
        is_active = COALESCE($6, is_active),
        updated_at = NOW()
      WHERE id = $7 RETURNING *`,
-    [b.name ?? null, b.description ?? null, b.price_cents ?? null, b.stripe_price_id ?? null, b.sort_order ?? null, b.is_active ?? null, id]
+    [b.name ?? null, b.description ?? null, b.price_cents ?? null, stripePriceId, b.sort_order ?? null, b.is_active ?? null, id]
   );
-  if (!result.rows[0]) return c.json({ error: "Not found" }, 404);
   return c.json(result.rows[0]);
 });
 

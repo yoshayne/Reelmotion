@@ -51,57 +51,52 @@ function PackagesTab() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-zinc-400">
-        Set the Stripe Price ID for each package to enable registration. Create the price in your{" "}
-        <a href="https://dashboard.stripe.com/products" target="_blank" rel="noreferrer" className="text-[#E8001D] hover:underline inline-flex items-center gap-0.5">
-          Stripe Dashboard <ExternalLink className="w-3 h-3" />
-        </a>
-        {" "}(one-time payment, not recurring), then paste the Price ID (starts with <code className="bg-zinc-900 px-1 rounded text-xs">price_</code>) here.
+        Set the price for each package and hit Save — a Stripe product and price are created automatically.
+        Registration buttons go live on the public page as soon as a package is active with a price.
       </p>
 
       {packages.map(pkg => {
         const edits = editing[pkg.id] ?? {};
         const isDirty = Object.keys(edits).length > 0;
+        const displayPrice = edits.price_cents !== undefined ? edits.price_cents : pkg.price_cents;
 
         return (
           <div key={pkg.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
             <div className="flex items-start justify-between gap-4 mb-3">
               <div>
                 <div className="font-bold text-sm">{pkg.name}</div>
-                <div className="text-zinc-400 text-xs mt-0.5">Default price: {formatPrice(pkg.price_cents)}</div>
+                <div className="text-zinc-400 text-xs mt-0.5">
+                  {pkg.stripe_price_id
+                    ? <span className="text-green-400">✓ Stripe price active</span>
+                    : <span className="text-amber-400">Save to generate Stripe price</span>}
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={edits.is_active !== undefined ? !!edits.is_active : pkg.is_active}
-                    onChange={e => setField(pkg.id, "is_active", e.target.checked)}
-                    className="w-3.5 h-3.5 accent-[#E8001D]"
-                  />
-                  Active
-                </label>
-              </div>
+              <label className="flex items-center gap-1.5 text-xs cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={edits.is_active !== undefined ? !!edits.is_active : pkg.is_active}
+                  onChange={e => setField(pkg.id, "is_active", e.target.checked)}
+                  className="w-3.5 h-3.5 accent-[#E8001D]"
+                />
+                Active
+              </label>
             </div>
 
             <div className="space-y-2">
-              <div>
-                <label className="text-xs text-zinc-500 mb-1 block">Stripe Price ID</label>
-                <input
-                  type="text"
-                  value={edits.stripe_price_id !== undefined ? (edits.stripe_price_id ?? "") : (pkg.stripe_price_id ?? "")}
-                  onChange={e => setField(pkg.id, "stripe_price_id", e.target.value || null)}
-                  placeholder="price_..."
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-[#E8001D]"
-                />
-              </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Price (cents)</label>
-                  <input
-                    type="number"
-                    value={edits.price_cents !== undefined ? edits.price_cents : pkg.price_cents}
-                    onChange={e => setField(pkg.id, "price_cents", Number(e.target.value))}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E8001D]"
-                  />
+                  <label className="text-xs text-zinc-500 mb-1 block">Price ($)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
+                    <input
+                      type="number"
+                      min={1}
+                      step={0.01}
+                      value={(displayPrice / 100).toFixed(2)}
+                      onChange={e => setField(pkg.id, "price_cents", Math.round(parseFloat(e.target.value) * 100))}
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-6 pr-3 py-2 text-sm text-white focus:outline-none focus:border-[#E8001D]"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs text-zinc-500 mb-1 block">Sort order</label>
