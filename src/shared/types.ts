@@ -182,6 +182,54 @@ export interface SubscriptionAttempt {
   created_at: string;
 }
 
+export interface ActingClassPackage {
+  id: number;
+  name: string;
+  description: string | null;
+  price_cents: number;
+  stripe_price_id: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ActingClassDate {
+  id: number;
+  package_id: number;
+  date: string;
+  time: string;
+  capacity: number;
+  spots_remaining: number;
+  is_active: boolean;
+  created_at: string;
+  // joined
+  package_name?: string;
+  price_cents?: number;
+  stripe_price_id?: string | null;
+}
+
+export interface ActingClassRegistration {
+  id: number;
+  date_id: number;
+  stripe_session_id: string | null;
+  customer_email: string;
+  customer_name: string | null;
+  status: "pending" | "confirmed" | "cancelled";
+  created_at: string;
+  // joined
+  package_name?: string;
+  class_date?: string;
+  class_time?: string;
+  price_cents?: number;
+}
+
+export interface ActingClassWaitlistEntry {
+  id: number;
+  email: string;
+  name: string | null;
+  created_at: string;
+}
+
 export interface BrowseData {
   videos: Video[];
   coming_soon: Video[];

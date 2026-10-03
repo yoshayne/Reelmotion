@@ -413,5 +413,77 @@ export async function runMigrations() {
     END $$;
   `);
 
+  // ─── Acting Classes ───────────────────────────────────────────────────────
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS acting_class_packages (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      price_cents INTEGER NOT NULL DEFAULT 0,
+      stripe_price_id TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS acting_class_dates (
+      id SERIAL PRIMARY KEY,
+      package_id INTEGER NOT NULL REFERENCES acting_class_packages(id) ON DELETE CASCADE,
+      date DATE NOT NULL,
+      time TEXT NOT NULL DEFAULT '2:00 PM',
+      capacity INTEGER NOT NULL DEFAULT 12,
+      spots_remaining INTEGER NOT NULL DEFAULT 12,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS acting_class_registrations (
+      id SERIAL PRIMARY KEY,
+      date_id INTEGER NOT NULL REFERENCES acting_class_dates(id),
+      stripe_session_id TEXT UNIQUE,
+      customer_email TEXT NOT NULL,
+      customer_name TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS acting_class_waitlist (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL,
+      name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  // Seed the 5 base packages (ON CONFLICT by name keeps existing data intact)
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS acting_class_packages_name_idx ON acting_class_packages(name)
+  `).catch(() => {});
+
+  const packages = [
+    { name: 'Self-Tape Audition Workshop',       price: 5000, sort: 1 },
+    { name: 'Workshop + Professional Self-Tape', price: 7500, sort: 2 },
+    { name: 'Actor Starter Package',             price: 10000, sort: 3 },
+    { name: '1-on-1 Premium Self-Tape Session',  price: 12500, sort: 4 },
+    { name: 'The Casting Room',                  price: 3500,  sort: 5 },
+  ];
+  for (const p of packages) {
+    await query(
+      `INSERT INTO acting_class_packages (name, price_cents, sort_order)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (name) DO NOTHING`,
+      [p.name, p.price, p.sort]
+    );
+  }
+
   console.log("DB migrations complete.");
 }

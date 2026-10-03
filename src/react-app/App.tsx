@@ -42,6 +42,9 @@ import AdminRoyalties from "@/react-app/pages/admin/AdminRoyalties";
 import ActivateTVPage from "@/react-app/pages/ActivateTV";
 import NativeSigninComplete from "@/react-app/pages/NativeSigninComplete";
 import NativeSignin from "@/react-app/pages/NativeSignin";
+import ActingClasses from "@/react-app/pages/ActingClasses";
+import ClassSuccess from "@/react-app/pages/ClassSuccess";
+import AdminActingClasses from "@/react-app/pages/admin/AdminActingClasses";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -110,6 +113,9 @@ export default function App() {
           <Route path="/admin/analytics/acquisition" element={<AdminAcquisitionAnalytics />} />
           <Route path="/admin/royalties" element={<AdminRoyalties />} />
           <Route path="/activate" element={<ActivateTVPage />} />
+          <Route path="/classes" element={<ActingClasses />} />
+          <Route path="/classes/success" element={<ClassSuccess />} />
+          <Route path="/admin/acting-classes" element={<AdminActingClasses />} />
         </Routes>
         </Layout>
       </Router>

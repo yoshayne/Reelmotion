@@ -257,11 +257,35 @@ app.post("/api/billing/stripe-webhook", async (c) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as {
+          id: string;
           customer: string;
           subscription: string;
-          metadata: { user_id?: string; billing_period?: string };
+          metadata: { user_id?: string; billing_period?: string; type?: string; date_id?: string };
           customer_email?: string;
+          customer_details?: { email?: string; name?: string };
+          custom_fields?: Array<{ key: string; text?: { value?: string } }>;
         };
+
+        // Acting class registration
+        if (session.metadata?.type === "acting_class" && session.metadata?.date_id) {
+          const dateId = Number(session.metadata.date_id);
+          const custEmail = session.customer_details?.email ?? session.customer_email ?? "";
+          const custName = session.customer_details?.name ??
+            session.custom_fields?.find(f => f.key === "full_name")?.text?.value ?? null;
+          await query(
+            `UPDATE acting_class_registrations
+             SET status = 'confirmed', customer_email = $1, customer_name = COALESCE($2, customer_name)
+             WHERE stripe_session_id = $3`,
+            [custEmail, custName, session.id]
+          );
+          await query(
+            `UPDATE acting_class_dates SET spots_remaining = GREATEST(spots_remaining - 1, 0)
+             WHERE id = $1`,
+            [dateId]
+          );
+          break;
+        }
+
         const userId = session.metadata?.user_id;
         if (!userId) break;
 
@@ -2647,6 +2671,184 @@ for (const prefix of ["/series", "/series-info"]) {
 
 // ─── SPA fallback ────────────────────────────────────────────────────────────
 // Any unhandled /api/* request returns JSON 404 — never falls through to HTML
+// ─── Acting Classes (Public) ─────────────────────────────────────────────────
+
+app.get("/api/classes", async (c) => {
+  const packages = await query(`
+    SELECT p.*,
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'id', d.id, 'date', d.date, 'time', d.time,
+            'capacity', d.capacity, 'spots_remaining', d.spots_remaining
+          ) ORDER BY d.date
+        ) FILTER (WHERE d.id IS NOT NULL AND d.is_active = true AND d.date >= CURRENT_DATE),
+        '[]'
+      ) AS dates
+    FROM acting_class_packages p
+    LEFT JOIN acting_class_dates d ON d.package_id = p.id
+    WHERE p.is_active = true
+    GROUP BY p.id
+    ORDER BY p.sort_order
+  `);
+  return c.json(packages.rows);
+});
+
+app.post("/api/classes/checkout", async (c) => {
+  const body = await c.req.json<{ date_id: number; customer_name?: string; customer_email?: string }>();
+  const dateRow = await query<{
+    id: number; date: string; time: string; spots_remaining: number;
+    package_id: number; stripe_price_id: string | null; name: string; price_cents: number;
+  }>(
+    `SELECT d.*, p.stripe_price_id, p.name, p.price_cents
+     FROM acting_class_dates d JOIN acting_class_packages p ON p.id = d.package_id
+     WHERE d.id = $1 AND d.is_active = true AND d.date >= CURRENT_DATE`,
+    [body.date_id]
+  );
+  const slot = dateRow.rows[0];
+  if (!slot) return c.json({ error: "Date not found or unavailable" }, 404);
+  if (slot.spots_remaining <= 0) return c.json({ error: "This session is full" }, 409);
+  if (!slot.stripe_price_id) return c.json({ error: "Registration not yet available for this package" }, 503);
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    payment_method_types: ["card"],
+    customer_email: body.customer_email || undefined,
+    line_items: [{ price: slot.stripe_price_id, quantity: 1 }],
+    success_url: `${process.env.APP_URL}/classes/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.APP_URL}/classes`,
+    metadata: {
+      type: "acting_class",
+      date_id: String(slot.id),
+      package_name: slot.name,
+      class_date: slot.date,
+    },
+    custom_fields: body.customer_name ? undefined : [
+      { key: "full_name", label: { type: "custom", custom: "Full name" }, type: "text" }
+    ],
+  });
+
+  // Reserve a pending registration
+  await query(
+    `INSERT INTO acting_class_registrations (date_id, stripe_session_id, customer_email, customer_name, status)
+     VALUES ($1, $2, $3, $4, 'pending')`,
+    [slot.id, session.id, body.customer_email ?? "", body.customer_name ?? null]
+  );
+
+  return c.json({ url: session.url });
+});
+
+app.post("/api/classes/waitlist", async (c) => {
+  const body = await c.req.json<{ email: string; name?: string }>();
+  if (!body.email) return c.json({ error: "Email required" }, 400);
+  await query(
+    `INSERT INTO acting_class_waitlist (email, name) VALUES ($1, $2)`,
+    [body.email.toLowerCase().trim(), body.name ?? null]
+  );
+  return c.json({ success: true });
+});
+
+// ─── Acting Classes (Admin) ──────────────────────────────────────────────────
+
+app.get("/api/admin/classes/packages", clerkAuth, adminAuth, async (c) => {
+  const result = await query(`SELECT * FROM acting_class_packages ORDER BY sort_order, id`);
+  return c.json(result.rows);
+});
+
+app.post("/api/admin/classes/packages", clerkAuth, adminAuth, async (c) => {
+  const b = await c.req.json<{ name: string; description?: string; price_cents: number; stripe_price_id?: string; sort_order?: number }>();
+  const result = await query(
+    `INSERT INTO acting_class_packages (name, description, price_cents, stripe_price_id, sort_order)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [b.name, b.description ?? null, b.price_cents, b.stripe_price_id ?? null, b.sort_order ?? 0]
+  );
+  return c.json(result.rows[0], 201);
+});
+
+app.patch("/api/admin/classes/packages/:id", clerkAuth, adminAuth, async (c) => {
+  const id = Number(c.req.param("id"));
+  const b = await c.req.json<Record<string, unknown>>();
+  const result = await query(
+    `UPDATE acting_class_packages SET
+       name = COALESCE($1, name),
+       description = CASE WHEN $2::text IS NOT NULL THEN $2 ELSE description END,
+       price_cents = COALESCE($3, price_cents),
+       stripe_price_id = CASE WHEN $4::text IS NOT NULL THEN $4 ELSE stripe_price_id END,
+       sort_order = COALESCE($5, sort_order),
+       is_active = COALESCE($6, is_active),
+       updated_at = NOW()
+     WHERE id = $7 RETURNING *`,
+    [b.name ?? null, b.description ?? null, b.price_cents ?? null, b.stripe_price_id ?? null, b.sort_order ?? null, b.is_active ?? null, id]
+  );
+  if (!result.rows[0]) return c.json({ error: "Not found" }, 404);
+  return c.json(result.rows[0]);
+});
+
+app.delete("/api/admin/classes/packages/:id", clerkAuth, adminAuth, async (c) => {
+  await query(`DELETE FROM acting_class_packages WHERE id = $1`, [Number(c.req.param("id"))]);
+  return c.json({ success: true });
+});
+
+app.get("/api/admin/classes/dates", clerkAuth, adminAuth, async (c) => {
+  const result = await query(`
+    SELECT d.*, p.name AS package_name, p.price_cents, p.stripe_price_id
+    FROM acting_class_dates d JOIN acting_class_packages p ON p.id = d.package_id
+    ORDER BY d.date DESC, p.sort_order
+  `);
+  return c.json(result.rows);
+});
+
+app.post("/api/admin/classes/dates", clerkAuth, adminAuth, async (c) => {
+  const b = await c.req.json<{ package_id: number; date: string; time?: string; capacity?: number }>();
+  const cap = b.capacity ?? 12;
+  const result = await query(
+    `INSERT INTO acting_class_dates (package_id, date, time, capacity, spots_remaining)
+     VALUES ($1, $2, $3, $4, $4) RETURNING *`,
+    [b.package_id, b.date, b.time ?? "2:00 PM", cap]
+  );
+  return c.json(result.rows[0], 201);
+});
+
+app.patch("/api/admin/classes/dates/:id", clerkAuth, adminAuth, async (c) => {
+  const id = Number(c.req.param("id"));
+  const b = await c.req.json<Record<string, unknown>>();
+  const result = await query(
+    `UPDATE acting_class_dates SET
+       date = COALESCE($1, date),
+       time = COALESCE($2, time),
+       capacity = COALESCE($3, capacity),
+       spots_remaining = COALESCE($4, spots_remaining),
+       is_active = COALESCE($5, is_active),
+       updated_at = NOW()
+     WHERE id = $6 RETURNING *`,
+    [b.date ?? null, b.time ?? null, b.capacity ?? null, b.spots_remaining ?? null, b.is_active ?? null, id]
+  );
+  if (!result.rows[0]) return c.json({ error: "Not found" }, 404);
+  return c.json(result.rows[0]);
+});
+
+app.delete("/api/admin/classes/dates/:id", clerkAuth, adminAuth, async (c) => {
+  await query(`DELETE FROM acting_class_dates WHERE id = $1`, [Number(c.req.param("id"))]);
+  return c.json({ success: true });
+});
+
+app.get("/api/admin/classes/registrations", clerkAuth, adminAuth, async (c) => {
+  const result = await query(`
+    SELECT r.*, p.name AS package_name, d.date AS class_date, d.time AS class_time, p.price_cents
+    FROM acting_class_registrations r
+    JOIN acting_class_dates d ON d.id = r.date_id
+    JOIN acting_class_packages p ON p.id = d.package_id
+    ORDER BY r.created_at DESC
+    LIMIT 200
+  `);
+  return c.json(result.rows);
+});
+
+app.get("/api/admin/classes/waitlist", clerkAuth, adminAuth, async (c) => {
+  const result = await query(`SELECT * FROM acting_class_waitlist ORDER BY created_at DESC`);
+  return c.json(result.rows);
+});
+
 app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));
 app.use("/*", serveStatic({ root: "./dist/client" }));
 app.get("/*", async (c) => {

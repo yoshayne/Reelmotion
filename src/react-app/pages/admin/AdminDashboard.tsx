@@ -115,6 +115,7 @@ export default function AdminDashboard() {
     { to: "/admin/contest-submissions", icon: AlignLeft, label: "Contest Submissions", count: null },
     { to: "/admin/promo-popups", icon: Megaphone, label: "Promo Popups", count: null },
     { to: "/admin/comments", icon: MessageSquare, label: "Comments", count: null },
+    { to: "/admin/acting-classes", icon: Target, label: "Acting Classes", count: null },
   ];
 
   if (isChecking) {
