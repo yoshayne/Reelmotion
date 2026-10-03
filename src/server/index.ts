@@ -2677,6 +2677,17 @@ for (const prefix of ["/series", "/series-info"]) {
   });
 }
 
+// ─── /classes OG route ───────────────────────────────────────────────────────
+app.get("/classes", async (c) => {
+  return c.html(await injectOG(await getSpaHtml(), {
+    title: "The Self-Tape Room — Actor Training & Workshops",
+    description: "Hands-on workshops for actors. Self-tape training, audition prep, headshots & private coaching. Saturdays at reelmotionapp.com/classes",
+    image: "https://reelmotionapp.com/classes/og.png",
+    url: "https://reelmotionapp.com/classes",
+  }));
+});
+app.get("/classes/success", async (c) => c.html(await getSpaHtml()));
+
 // ─── SPA fallback ────────────────────────────────────────────────────────────
 // Any unhandled /api/* request returns JSON 404 — never falls through to HTML
 // ─── Acting Classes (Public) ─────────────────────────────────────────────────
