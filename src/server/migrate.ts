@@ -362,16 +362,16 @@ export async function runMigrations() {
 
   // Seed fake viewer accounts used for comment attribution
   await query(`
-    INSERT INTO users (clerk_user_id, display_name, role) VALUES
-      ('seed_viewer_001', 'Nia T.',       'viewer'),
-      ('seed_viewer_002', 'Marcus B.',    'viewer'),
-      ('seed_viewer_003', 'Jade R.',      'viewer'),
-      ('seed_viewer_004', 'Dre Washington','viewer'),
-      ('seed_viewer_005', 'Simone K.',    'viewer'),
-      ('seed_viewer_006', 'TylerFromATL', 'viewer'),
-      ('seed_viewer_007', 'Camille M.',   'viewer'),
-      ('seed_viewer_008', 'Raheem J.',    'viewer'),
-      ('seed_viewer_009', 'Aaliyah C.',   'viewer')
+    INSERT INTO users (clerk_user_id, email, display_name, role) VALUES
+      ('seed_viewer_001', 'seed_viewer_001@reelmotion.internal', 'Nia T.',       'viewer'),
+      ('seed_viewer_002', 'seed_viewer_002@reelmotion.internal', 'Marcus B.',    'viewer'),
+      ('seed_viewer_003', 'seed_viewer_003@reelmotion.internal', 'Jade R.',      'viewer'),
+      ('seed_viewer_004', 'seed_viewer_004@reelmotion.internal', 'Dre Washington','viewer'),
+      ('seed_viewer_005', 'seed_viewer_005@reelmotion.internal', 'Simone K.',    'viewer'),
+      ('seed_viewer_006', 'seed_viewer_006@reelmotion.internal', 'TylerFromATL', 'viewer'),
+      ('seed_viewer_007', 'seed_viewer_007@reelmotion.internal', 'Camille M.',   'viewer'),
+      ('seed_viewer_008', 'seed_viewer_008@reelmotion.internal', 'Raheem J.',    'viewer'),
+      ('seed_viewer_009', 'seed_viewer_009@reelmotion.internal', 'Aaliyah C.',   'viewer')
     ON CONFLICT (clerk_user_id) DO NOTHING
   `);
 
