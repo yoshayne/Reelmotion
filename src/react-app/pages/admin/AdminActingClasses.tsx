@@ -8,7 +8,7 @@ import { Plus, Trash2, Check, X, ExternalLink, Users, Pencil } from "lucide-reac
 type Tab = "packages" | "dates" | "registrations" | "waitlist";
 
 function formatDate(d: string) {
-  return new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  return new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 }
 // ─── Packages Tab ─────────────────────────────────────────────────────────────
 
@@ -176,7 +176,7 @@ function DatesTab() {
 
   const startEdit = (d: ActingClassDate) => {
     setEditingId(d.id);
-    setEditForm({ package_id: d.package_id, date: d.date, time: d.time, capacity: d.capacity });
+    setEditForm({ package_id: d.package_id, date: d.date.slice(0, 10), time: d.time, capacity: d.capacity });
   };
 
   const saveEdit = async () => {
@@ -205,8 +205,8 @@ function DatesTab() {
     setDates(prev => prev.map(x => x.id === d.id ? { ...x, ...updated } : x));
   };
 
-  const upcoming = dates.filter(d => new Date(d.date + "T23:59:00") >= new Date()).sort((a, b) => a.date.localeCompare(b.date));
-  const past = dates.filter(d => new Date(d.date + "T23:59:00") < new Date()).sort((a, b) => b.date.localeCompare(a.date));
+  const upcoming = dates.filter(d => new Date(d.date.slice(0, 10) + "T23:59:00") >= new Date()).sort((a, b) => a.date.localeCompare(b.date));
+  const past = dates.filter(d => new Date(d.date.slice(0, 10) + "T23:59:00") < new Date()).sort((a, b) => b.date.localeCompare(a.date));
 
   return (
     <div className="space-y-6">

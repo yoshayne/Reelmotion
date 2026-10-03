@@ -65,7 +65,7 @@ const PACKAGE_DETAILS: Record<string, {
 };
 
 function formatDate(dateStr: string) {
-  const d = new Date(dateStr + "T12:00:00");
+  const d = new Date(dateStr.slice(0, 10) + "T12:00:00");
   return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 }
 
