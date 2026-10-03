@@ -2843,14 +2843,15 @@ app.patch("/api/admin/classes/dates/:id", clerkAuth, adminAuth, async (c) => {
   const b = await c.req.json<Record<string, unknown>>();
   const result = await query(
     `UPDATE acting_class_dates SET
-       date = COALESCE($1, date),
-       time = COALESCE($2, time),
-       capacity = COALESCE($3, capacity),
-       spots_remaining = COALESCE($4, spots_remaining),
-       is_active = COALESCE($5, is_active),
+       package_id = COALESCE($1, package_id),
+       date = COALESCE($2, date),
+       time = COALESCE($3, time),
+       capacity = COALESCE($4, capacity),
+       spots_remaining = COALESCE($5, spots_remaining),
+       is_active = COALESCE($6, is_active),
        updated_at = NOW()
-     WHERE id = $6 RETURNING *`,
-    [b.date ?? null, b.time ?? null, b.capacity ?? null, b.spots_remaining ?? null, b.is_active ?? null, id]
+     WHERE id = $7 RETURNING *`,
+    [b.package_id ?? null, b.date ?? null, b.time ?? null, b.capacity ?? null, b.spots_remaining ?? null, b.is_active ?? null, id]
   );
   if (!result.rows[0]) return c.json({ error: "Not found" }, 404);
   return c.json(result.rows[0]);

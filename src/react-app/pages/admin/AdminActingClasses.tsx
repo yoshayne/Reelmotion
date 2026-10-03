@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { apiFetch } from "@/react-app/utils/api";
 import { useAdminRole } from "@/react-app/hooks/useAdminRole";
 import type { ActingClassPackage, ActingClassDate, ActingClassRegistration, ActingClassWaitlistEntry } from "@/shared/types";
-import { Plus, Trash2, Check, X, ExternalLink, Users } from "lucide-react";
+import { Plus, Trash2, Check, X, ExternalLink, Users, Pencil } from "lucide-react";
 
 type Tab = "packages" | "dates" | "registrations" | "waitlist";
 
@@ -135,6 +135,9 @@ function DatesTab() {
   const [packages, setPackages] = useState<ActingClassPackage[]>([]);
   const [form, setForm] = useState({ package_id: 0, date: "", time: "2:00 PM", capacity: 12 });
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<{ package_id: number; date: string; time: string; capacity: number }>({ package_id: 0, date: "", time: "", capacity: 0 });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -169,6 +172,28 @@ function DatesTab() {
     if (!confirm("Delete this date?")) return;
     await apiFetch(`/api/admin/classes/dates/${id}`, { method: "DELETE" });
     setDates(prev => prev.filter(d => d.id !== id));
+  };
+
+  const startEdit = (d: ActingClassDate) => {
+    setEditingId(d.id);
+    setEditForm({ package_id: d.package_id, date: d.date, time: d.time, capacity: d.capacity });
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    setSaving(true);
+    try {
+      const res = await apiFetch(`/api/admin/classes/dates/${editingId}`, {
+        method: "PATCH",
+        body: JSON.stringify(editForm),
+      });
+      const updated = await res.json() as ActingClassDate;
+      const pkg = packages.find(p => p.id === updated.package_id);
+      setDates(prev => prev.map(d => d.id === editingId ? { ...d, ...updated, package_name: pkg?.name ?? d.package_name } : d));
+      setEditingId(null);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleActive = async (d: ActingClassDate) => {
@@ -246,20 +271,83 @@ function DatesTab() {
           <div className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Upcoming</div>
           <div className="space-y-2">
             {upcoming.map(d => (
-              <div key={d.id} className={`flex items-center justify-between gap-3 bg-zinc-900 border rounded-xl px-4 py-3 ${d.is_active ? "border-zinc-800" : "border-zinc-900 opacity-50"}`}>
-                <div>
-                  <div className="text-sm font-semibold">{d.package_name}</div>
-                  <div className="text-xs text-zinc-400">{formatDate(d.date)} · {d.time}</div>
-                  <div className="text-xs text-zinc-500 mt-0.5">{d.spots_remaining}/{d.capacity} spots remaining</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => toggleActive(d)} className={`text-xs px-2 py-1 rounded-lg font-medium ${d.is_active ? "bg-green-900/40 text-green-400" : "bg-zinc-800 text-zinc-500"}`}>
-                    {d.is_active ? "Active" : "Hidden"}
-                  </button>
-                  <button onClick={() => deleteDate(d.id)} className="p-1.5 bg-zinc-800 hover:bg-red-900/40 hover:text-red-400 rounded-lg transition-colors">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+              <div key={d.id} className={`bg-zinc-900 border rounded-xl px-4 py-3 ${d.is_active ? "border-zinc-800" : "border-zinc-900 opacity-60"}`}>
+                {editingId === d.id ? (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="col-span-2">
+                        <label className="text-xs text-zinc-500 mb-1 block">Package</label>
+                        <select
+                          value={editForm.package_id}
+                          onChange={e => setEditForm(f => ({ ...f, package_id: Number(e.target.value) }))}
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E8001D]"
+                        >
+                          {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-zinc-500 mb-1 block">Date</label>
+                        <input
+                          type="date"
+                          value={editForm.date}
+                          onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))}
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E8001D]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-zinc-500 mb-1 block">Time</label>
+                        <input
+                          type="text"
+                          value={editForm.time}
+                          onChange={e => setEditForm(f => ({ ...f, time: e.target.value }))}
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E8001D]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-zinc-500 mb-1 block">Capacity</label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={editForm.capacity}
+                          onChange={e => setEditForm(f => ({ ...f, capacity: Number(e.target.value) }))}
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E8001D]"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={saveEdit}
+                        disabled={saving}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-[#E8001D] hover:bg-red-700 rounded-lg text-xs font-bold transition-colors"
+                      >
+                        <Check className="w-3 h-3" />
+                        {saving ? "Saving…" : "Save"}
+                      </button>
+                      <button onClick={() => setEditingId(null)} className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs transition-colors">
+                        <X className="w-3 h-3" /> Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">{d.package_name}</div>
+                      <div className="text-xs text-zinc-400">{formatDate(d.date)} · {d.time}</div>
+                      <div className="text-xs text-zinc-500 mt-0.5">{d.spots_remaining}/{d.capacity} spots remaining</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => toggleActive(d)} className={`text-xs px-2 py-1 rounded-lg font-medium ${d.is_active ? "bg-green-900/40 text-green-400" : "bg-zinc-800 text-zinc-500"}`}>
+                        {d.is_active ? "Active" : "Hidden"}
+                      </button>
+                      <button onClick={() => startEdit(d)} className="p-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => deleteDate(d.id)} className="p-1.5 bg-zinc-800 hover:bg-red-900/40 hover:text-red-400 rounded-lg transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
