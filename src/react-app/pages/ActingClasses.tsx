@@ -6,14 +6,10 @@ import type { ActingClassPackage, ActingClassDate } from "@/shared/types";
 type PackageWithDates = ActingClassPackage & { dates: ActingClassDate[] };
 
 const PACKAGE_IMAGES: Record<string, string> = {
-  "Self-Tape Audition Workshop":
-    "https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=600&q=80&fit=crop",
-  "Workshop + Professional Self-Tape":
-    "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=600&q=80&fit=crop",
-  "Actor Starter Package":
-    "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&q=80&fit=crop",
-  "1-on-1 Premium Self-Tape Session":
-    "https://images.unsplash.com/photo-1542204165-65bf26472b9b?w=600&q=80&fit=crop",
+  "Self-Tape Audition Workshop":      "/classes/workshop.webp",
+  "Workshop + Professional Self-Tape": "/classes/selftape.webp",
+  "Actor Starter Package":             "/classes/starter.webp",
+  "1-on-1 Premium Self-Tape Session":  "/classes/private.webp",
 };
 
 const PACKAGE_DETAILS: Record<string, {
@@ -246,9 +242,9 @@ function CastingRoomBanner({ pkg }: { pkg: PackageWithDates }) {
     <div className="border border-cyan-500/25 rounded-2xl overflow-hidden relative">
       {/* Background image */}
       <img
-        src="https://images.unsplash.com/photo-1485846234645-a62644f84728?w=1200&q=70&fit=crop"
+        src="/classes/casting.webp"
         alt=""
-        className="absolute inset-0 w-full h-full object-cover opacity-10"
+        className="absolute inset-0 w-full h-full object-cover opacity-20"
       />
       <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a14] via-[#0a0a14]/95 to-[#080810]/90" />
       <div className="relative flex flex-col md:flex-row md:items-center gap-4 p-5 md:p-6">
@@ -399,9 +395,9 @@ export default function ActingClasses() {
         {/* Background image */}
         <div className="absolute inset-0">
           <img
-            src="https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=1400&q=80&fit=crop"
+            src="/classes/hero.webp"
             alt=""
-            className="w-full h-full object-cover object-center opacity-25"
+            className="w-full h-full object-cover object-center opacity-40"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050508]/60 via-[#050508]/50 to-[#050508]" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#050508]/80 via-transparent to-[#050508]/80" />
@@ -439,11 +435,11 @@ export default function ActingClasses() {
       {/* Photo strip */}
       <div className="flex h-28 overflow-hidden mb-0">
         {[
-          "https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=400&q=70&fit=crop",
-          "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400&q=70&fit=crop",
-          "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&q=70&fit=crop",
-          "https://images.unsplash.com/photo-1542204165-65bf26472b9b?w=400&q=70&fit=crop",
-          "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=400&q=70&fit=crop",
+          "/classes/workshop.webp",
+          "/classes/selftape.webp",
+          "/classes/starter.webp",
+          "/classes/private.webp",
+          "/classes/casting.webp",
         ].map((src, i) => (
           <div key={i} className="flex-1 overflow-hidden relative">
             <img src={src} alt="" className="w-full h-full object-cover opacity-40" />
