@@ -19,13 +19,6 @@ import { clerkAuth, adminAuth, clerk } from "./auth.js";
 import {
   sendClassRegistrationConfirmation,
   notifyAdminClassRegistration,
-  sendSubscriptionConfirmationEmail,
-  sendPaymentReceiptEmail,
-  sendPaymentFailedEmail,
-  sendCancellationEmail,
-  notifyAdminNewSubscription,
-  notifyAdminPaymentFailed,
-  notifyAdminCancellation,
 } from "./email.js";
 
 // Rewrite private storage URLs → /api/images/:key proxy so browser can load them.
