@@ -5,6 +5,17 @@ import type { ActingClassPackage, ActingClassDate } from "@/shared/types";
 
 type PackageWithDates = ActingClassPackage & { dates: ActingClassDate[] };
 
+const PACKAGE_IMAGES: Record<string, string> = {
+  "Self-Tape Audition Workshop":
+    "https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=600&q=80&fit=crop",
+  "Workshop + Professional Self-Tape":
+    "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=600&q=80&fit=crop",
+  "Actor Starter Package":
+    "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&q=80&fit=crop",
+  "1-on-1 Premium Self-Tape Session":
+    "https://images.unsplash.com/photo-1542204165-65bf26472b9b?w=600&q=80&fit=crop",
+};
+
 const PACKAGE_DETAILS: Record<string, {
   tagline: string;
   bullets: string[];
@@ -133,14 +144,28 @@ function PackageCard({ pkg }: { pkg: PackageWithDates }) {
   const upcomingDates = pkg.dates.filter(d => d.is_active);
   const isPrivate = pkg.name === "1-on-1 Premium Self-Tape Session";
 
+  const img = PACKAGE_IMAGES[pkg.name];
+
   return (
     <div className="flex flex-col bg-[#0a0a0f] border border-white/10 rounded-2xl overflow-hidden hover:border-cyan-500/40 transition-colors group">
-      {/* Top accent bar */}
-      <div className="h-0.5 w-full bg-gradient-to-r from-cyan-500 to-cyan-400/0" />
+      {/* Card photo */}
+      {img && (
+        <div className="relative h-36 overflow-hidden">
+          <img
+            src={img}
+            alt={pkg.name}
+            className="w-full h-full object-cover opacity-70 group-hover:opacity-80 transition-opacity group-hover:scale-105 duration-500"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-[#0a0a0f]" />
+          <div className="absolute bottom-2 left-3 text-4xl font-black text-cyan-400 drop-shadow-lg">{formatPrice(pkg.price_cents)}</div>
+        </div>
+      )}
+      {/* Top accent bar (when no image) */}
+      {!img && <div className="h-0.5 w-full bg-gradient-to-r from-cyan-500 to-cyan-400/0" />}
 
       <div className="flex flex-col flex-1 p-5">
-        {/* Price */}
-        <div className="text-4xl font-black text-cyan-400 mb-1">{formatPrice(pkg.price_cents)}</div>
+        {/* Price (only shown when no image) */}
+        {!img && <div className="text-4xl font-black text-cyan-400 mb-1">{formatPrice(pkg.price_cents)}</div>}
 
         {/* Name */}
         <h2 className="text-base font-black leading-tight text-white mb-2">{pkg.name}</h2>
@@ -218,8 +243,15 @@ function CastingRoomBanner({ pkg }: { pkg: PackageWithDates }) {
   };
 
   return (
-    <div className="border border-cyan-500/25 rounded-2xl overflow-hidden bg-gradient-to-r from-[#0a0a14] to-[#080810]">
-      <div className="flex flex-col md:flex-row md:items-center gap-4 p-5 md:p-6">
+    <div className="border border-cyan-500/25 rounded-2xl overflow-hidden relative">
+      {/* Background image */}
+      <img
+        src="https://images.unsplash.com/photo-1485846234645-a62644f84728?w=1200&q=70&fit=crop"
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover opacity-10"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a14] via-[#0a0a14]/95 to-[#080810]/90" />
+      <div className="relative flex flex-col md:flex-row md:items-center gap-4 p-5 md:p-6">
         {/* Left: label */}
         <div className="flex-shrink-0">
           <div className="text-xs font-bold tracking-widest text-cyan-400 uppercase mb-0.5">Monthly Event</div>
@@ -363,13 +395,24 @@ export default function ActingClasses() {
     <div className="min-h-screen text-white" style={{ backgroundColor: "#050508" }}>
 
       {/* Hero */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-[-80px] left-[20%] w-[500px] h-[500px] rounded-full blur-[160px]" style={{ background: "radial-gradient(circle, rgba(6,182,212,0.08) 0%, transparent 70%)" }} />
-          <div className="absolute top-0 right-[10%] w-[300px] h-[300px] rounded-full blur-[120px]" style={{ background: "radial-gradient(circle, rgba(232,0,29,0.05) 0%, transparent 70%)" }} />
+      <div className="relative overflow-hidden min-h-[520px] flex items-center">
+        {/* Background image */}
+        <div className="absolute inset-0">
+          <img
+            src="https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=1400&q=80&fit=crop"
+            alt=""
+            className="w-full h-full object-cover object-center opacity-25"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050508]/60 via-[#050508]/50 to-[#050508]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#050508]/80 via-transparent to-[#050508]/80" />
         </div>
 
-        <div className="relative max-w-5xl mx-auto px-4 pt-20 pb-14 text-center">
+        {/* Glow overlays */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-[20%] w-[500px] h-[400px] rounded-full blur-[160px]" style={{ background: "radial-gradient(circle, rgba(6,182,212,0.1) 0%, transparent 70%)" }} />
+        </div>
+
+        <div className="relative w-full max-w-5xl mx-auto px-4 pt-20 pb-14 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 border border-cyan-500/30 rounded-full text-xs text-cyan-400 font-bold tracking-widest uppercase mb-7">
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
             Actor Training · The Self-Tape Room
@@ -379,7 +422,7 @@ export default function ActingClasses() {
             <span className="text-cyan-400">REAL PRACTICE.</span><br />
             REAL OPPORTUNITIES.
           </h1>
-          <p className="text-white/50 text-base md:text-lg max-w-xl mx-auto leading-relaxed">
+          <p className="text-white/60 text-base md:text-lg max-w-xl mx-auto leading-relaxed">
             Hands-on training for actors who want to become camera-ready,
             confident, and prepared for real auditions.
           </p>
@@ -391,6 +434,22 @@ export default function ActingClasses() {
             <span>Book</span>
           </div>
         </div>
+      </div>
+
+      {/* Photo strip */}
+      <div className="flex h-28 overflow-hidden mb-0">
+        {[
+          "https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=400&q=70&fit=crop",
+          "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400&q=70&fit=crop",
+          "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&q=70&fit=crop",
+          "https://images.unsplash.com/photo-1542204165-65bf26472b9b?w=400&q=70&fit=crop",
+          "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=400&q=70&fit=crop",
+        ].map((src, i) => (
+          <div key={i} className="flex-1 overflow-hidden relative">
+            <img src={src} alt="" className="w-full h-full object-cover opacity-40" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#050508]/30 to-[#050508]/60" />
+          </div>
+        ))}
       </div>
 
       {/* Section label */}
