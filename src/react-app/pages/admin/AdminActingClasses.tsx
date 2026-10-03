@@ -18,7 +18,7 @@ function PackagesTab() {
   const [saving, setSaving] = useState<number | null>(null);
 
   useEffect(() => {
-    apiFetch("/api/admin/classes/packages").then(r => r.json()).then(setPackages);
+    apiFetch("/api/admin/classes/packages").then(r => r.json()).then(d => { if (Array.isArray(d)) setPackages(d); });
   }, []);
 
   const setField = (id: number, field: keyof ActingClassPackage, val: unknown) => {
@@ -141,8 +141,8 @@ function DatesTab() {
       apiFetch("/api/admin/classes/dates").then(r => r.json()),
       apiFetch("/api/admin/classes/packages").then(r => r.json()),
     ]).then(([d, p]) => {
-      setDates(d as ActingClassDate[]);
-      const pkgs = p as ActingClassPackage[];
+      setDates(Array.isArray(d) ? d : []);
+      const pkgs: ActingClassPackage[] = Array.isArray(p) ? p : [];
       setPackages(pkgs);
       if (pkgs.length) setForm(f => ({ ...f, package_id: pkgs[0].id }));
     });
@@ -293,7 +293,7 @@ function RegistrationsTab() {
   const [regs, setRegs] = useState<ActingClassRegistration[]>([]);
 
   useEffect(() => {
-    apiFetch("/api/admin/classes/registrations").then(r => r.json()).then(setRegs);
+    apiFetch("/api/admin/classes/registrations").then(r => r.json()).then(d => { if (Array.isArray(d)) setRegs(d); });
   }, []);
 
   const confirmed = regs.filter(r => r.status === "confirmed");
@@ -346,7 +346,7 @@ function WaitlistTab() {
   const [list, setList] = useState<ActingClassWaitlistEntry[]>([]);
 
   useEffect(() => {
-    apiFetch("/api/admin/classes/waitlist").then(r => r.json()).then(setList);
+    apiFetch("/api/admin/classes/waitlist").then(r => r.json()).then(d => { if (Array.isArray(d)) setList(d); });
   }, []);
 
   return (
