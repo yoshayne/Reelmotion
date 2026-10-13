@@ -494,5 +494,41 @@ export async function runMigrations() {
     END $$;
   `);
 
+  // Reassign any comments on seeded videos that are still attributed to real user accounts
+  // (happens when the seed INSERT was skipped because comments already existed from manual testing)
+  await query(`
+    DO $$
+    DECLARE
+      v_video_id INTEGER;
+      seed_ids INTEGER[];
+      real_comment RECORD;
+      idx INTEGER := 1;
+    BEGIN
+      SELECT id INTO v_video_id FROM videos
+        WHERE title ILIKE '%Last Night on Sunset%' LIMIT 1;
+      IF v_video_id IS NULL THEN RETURN; END IF;
+
+      SELECT ARRAY(
+        SELECT id FROM users
+        WHERE clerk_user_id LIKE 'seed_viewer_%'
+        ORDER BY clerk_user_id
+      ) INTO seed_ids;
+      IF array_length(seed_ids, 1) IS NULL THEN RETURN; END IF;
+
+      FOR real_comment IN
+        SELECT c.id FROM comments c
+        JOIN users u ON c.user_id = u.id
+        WHERE c.video_id = v_video_id
+          AND u.clerk_user_id NOT LIKE 'seed_viewer_%'
+        ORDER BY c.created_at
+      LOOP
+        UPDATE comments
+          SET user_id = seed_ids[((idx - 1) % array_length(seed_ids, 1)) + 1]
+          WHERE id = real_comment.id;
+        idx := idx + 1;
+      END LOOP;
+    END $$;
+  `);
+
   console.log("DB migrations complete.");
 }
