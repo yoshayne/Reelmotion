@@ -245,7 +245,7 @@ export default function Browse() {
     );
   }
 
-  // Poster card (2:3 aspect ratio)
+  // Poster card — small, for horizontal scroll rows on "All" tab
   function PosterCard({ image, muxPlaybackId, muxDuration, title, onClick, badge }: { image?: string | null; muxPlaybackId?: string | null; muxDuration?: number | null; title: string; onClick: () => void; badge?: React.ReactNode }) {
     const imgSrc = getThumbnailUrl(image, muxPlaybackId, muxDuration);
     return (
@@ -265,6 +265,43 @@ export default function Browse() {
           </div>
         </div>
         <p className="text-[12px] font-semibold mt-1.5 truncate" style={{ color: 'rgba(255,255,255,0.85)' }}>{title}</p>
+      </div>
+    );
+  }
+
+  // Grid card — large 2-col, fills screen width, for filtered tabs
+  function GridCard({ image, muxPlaybackId, muxDuration, title, onClick, badge }: { image?: string | null; muxPlaybackId?: string | null; muxDuration?: number | null; title: string; onClick: () => void; badge?: React.ReactNode }) {
+    const imgSrc = getThumbnailUrl(image, muxPlaybackId, muxDuration);
+    return (
+      <div onClick={onClick} className="cursor-pointer w-full">
+        <div className="relative overflow-hidden rounded-lg" style={{ aspectRatio: '2/3' }}>
+          {imgSrc ? (
+            <img src={imgSrc} alt={title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
+              <Play className="w-10 h-10 text-zinc-700" />
+            </div>
+          )}
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 50%)' }} />
+          {badge && <div className="absolute top-2 left-2">{badge}</div>}
+          <div className="absolute bottom-3 left-3 right-3">
+            <div className="flex items-center gap-2">
+              <div className="flex-shrink-0 flex items-center justify-center" style={{ width: 30, height: 30, borderRadius: '50%', backgroundColor: 'rgba(232,0,29,0.95)' }}>
+                <Play className="w-3.5 h-3.5 ml-0.5" fill="currentColor" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <p className="text-[13px] font-semibold mt-2 truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{title}</p>
+      </div>
+    );
+  }
+
+  // 2-column grid wrapper for filtered views
+  function GridView({ children }: { children: React.ReactNode }) {
+    return (
+      <div className="grid grid-cols-2 gap-3 px-3 pt-4 pb-6">
+        {children}
       </div>
     );
   }
@@ -487,60 +524,111 @@ export default function Browse() {
 
         {/* Series section */}
         {(activeTab === "all" || activeTab === "series") && allSeries.length > 0 && (
-          <div className="mt-7 mb-2">
-            <SectionHead eyebrow="EXPLORE" title="Series" onSeeAll={() => setActiveTab("series")} />
-            <ScrollRow>
-              {allSeries.slice(0, 10).map((s: Series) => (
-                <PosterCard
-                  key={s.id}
-                  image={s.cover_image_url}
-                  title={s.title}
-                  onClick={() => navigate(`/series/${s.slug || s.id}`)}
-                />
-              ))}
-            </ScrollRow>
+          <div className={activeTab === "all" ? "mt-7 mb-2" : ""}>
+            {activeTab === "all" && <SectionHead eyebrow="EXPLORE" title="Series" onSeeAll={() => setActiveTab("series")} />}
+            {activeTab === "series" ? (
+              <GridView>
+                {allSeries.map((s: Series) => (
+                  <GridCard
+                    key={s.id}
+                    image={s.cover_image_url}
+                    title={s.title}
+                    onClick={() => navigate(`/series/${s.slug || s.id}`)}
+                  />
+                ))}
+              </GridView>
+            ) : (
+              <ScrollRow>
+                {allSeries.slice(0, 10).map((s: Series) => (
+                  <PosterCard
+                    key={s.id}
+                    image={s.cover_image_url}
+                    title={s.title}
+                    onClick={() => navigate(`/series/${s.slug || s.id}`)}
+                  />
+                ))}
+              </ScrollRow>
+            )}
           </div>
         )}
 
         {/* New section */}
         {(activeTab === "all" || activeTab === "new") && newCards.length > 0 && (
-          <div className="mt-7 mb-2">
-            <SectionHead eyebrow="JUST DROPPED" title="New" onSeeAll={() => setActiveTab("new")} />
-            <ScrollRow>
-              {newCards.slice(0, 10).map((card) => {
-                if (card.kind === "series") {
+          <div className={activeTab === "all" ? "mt-7 mb-2" : ""}>
+            {activeTab === "all" && <SectionHead eyebrow="JUST DROPPED" title="New" onSeeAll={() => setActiveTab("new")} />}
+            {activeTab === "new" ? (
+              <GridView>
+                {newCards.map((card) => {
+                  if (card.kind === "series") {
+                    return (
+                      <GridCard
+                        key={`series-${card.series.id}`}
+                        image={card.series.cover_image_url || card.series.carousel_image_url}
+                        title={card.series.title}
+                        onClick={() => navigate(`/series/${card.series.slug || card.series.id}`)}
+                        badge={
+                          card.isFree
+                            ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span>
+                            : <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest" style={{ backgroundColor: '#E8001D' }}>NEW</span>
+                        }
+                      />
+                    );
+                  }
+                  const v = card.video;
                   return (
-                    <PosterCard
-                      key={`series-${card.series.id}`}
-                      image={card.series.cover_image_url || card.series.carousel_image_url}
-                      title={card.series.title}
-                      onClick={() => navigate(`/series/${card.series.slug || card.series.id}`)}
+                    <GridCard
+                      key={`video-${v.id}`}
+                      image={v.thumbnail_url}
+                      muxPlaybackId={v.mux_playback_id}
+                      muxDuration={v.mux_duration}
+                      title={v.title}
+                      onClick={() => navigate(v.content_type === "episode" ? `/watch/${v.slug || v.id}` : `/movie-info/${v.slug || v.id}`)}
                       badge={
-                        card.isFree
+                        v.is_free
                           ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span>
                           : <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest" style={{ backgroundColor: '#E8001D' }}>NEW</span>
                       }
                     />
                   );
-                }
-                const v = card.video;
-                return (
-                  <PosterCard
-                    key={`video-${v.id}`}
-                    image={v.thumbnail_url}
-                    muxPlaybackId={v.mux_playback_id}
-                    muxDuration={v.mux_duration}
-                    title={v.title}
-                    onClick={() => navigate(v.content_type === "episode" ? `/watch/${v.slug || v.id}` : `/movie-info/${v.slug || v.id}`)}
-                    badge={
-                      v.is_free
-                        ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span>
-                        : <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest" style={{ backgroundColor: '#E8001D' }}>NEW</span>
-                    }
-                  />
-                );
-              })}
-            </ScrollRow>
+                })}
+              </GridView>
+            ) : (
+              <ScrollRow>
+                {newCards.slice(0, 10).map((card) => {
+                  if (card.kind === "series") {
+                    return (
+                      <PosterCard
+                        key={`series-${card.series.id}`}
+                        image={card.series.cover_image_url || card.series.carousel_image_url}
+                        title={card.series.title}
+                        onClick={() => navigate(`/series/${card.series.slug || card.series.id}`)}
+                        badge={
+                          card.isFree
+                            ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span>
+                            : <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest" style={{ backgroundColor: '#E8001D' }}>NEW</span>
+                        }
+                      />
+                    );
+                  }
+                  const v = card.video;
+                  return (
+                    <PosterCard
+                      key={`video-${v.id}`}
+                      image={v.thumbnail_url}
+                      muxPlaybackId={v.mux_playback_id}
+                      muxDuration={v.mux_duration}
+                      title={v.title}
+                      onClick={() => navigate(v.content_type === "episode" ? `/watch/${v.slug || v.id}` : `/movie-info/${v.slug || v.id}`)}
+                      badge={
+                        v.is_free
+                          ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span>
+                          : <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest" style={{ backgroundColor: '#E8001D' }}>NEW</span>
+                      }
+                    />
+                  );
+                })}
+              </ScrollRow>
+            )}
           </div>
         )}
 
@@ -603,47 +691,79 @@ export default function Browse() {
 
         {/* Movies section */}
         {(activeTab === "all" || activeTab === "movies") && movies.length > 0 && (
-          <div className="mt-7 mb-2">
-            <SectionHead eyebrow="WATCH NOW" title="Movies" onSeeAll={() => setActiveTab("movies")} />
-            <ScrollRow>
-              {movies.slice(0, 10).map((v: Video) => (
-                <PosterCard
-                  key={v.id}
-                  image={v.thumbnail_url}
-                  muxPlaybackId={v.mux_playback_id}
-                  muxDuration={v.mux_duration}
-                  title={v.title}
-                  onClick={() => navigate(`/watch/${v.slug || v.id}`)}
-                  badge={v.is_free ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span> : undefined}
-                />
-              ))}
-            </ScrollRow>
+          <div className={activeTab === "all" ? "mt-7 mb-2" : ""}>
+            {activeTab === "all" && <SectionHead eyebrow="WATCH NOW" title="Movies" onSeeAll={() => setActiveTab("movies")} />}
+            {activeTab === "movies" ? (
+              <GridView>
+                {movies.map((v: Video) => (
+                  <GridCard
+                    key={v.id}
+                    image={v.thumbnail_url}
+                    muxPlaybackId={v.mux_playback_id}
+                    muxDuration={v.mux_duration}
+                    title={v.title}
+                    onClick={() => navigate(`/watch/${v.slug || v.id}`)}
+                    badge={v.is_free ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span> : undefined}
+                  />
+                ))}
+              </GridView>
+            ) : (
+              <ScrollRow>
+                {movies.slice(0, 10).map((v: Video) => (
+                  <PosterCard
+                    key={v.id}
+                    image={v.thumbnail_url}
+                    muxPlaybackId={v.mux_playback_id}
+                    muxDuration={v.mux_duration}
+                    title={v.title}
+                    onClick={() => navigate(`/watch/${v.slug || v.id}`)}
+                    badge={v.is_free ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span> : undefined}
+                  />
+                ))}
+              </ScrollRow>
+            )}
           </div>
         )}
 
         {/* Clips section */}
         {(activeTab === "all" || activeTab === "clips") && clips.length > 0 && (
-          <div className="mt-7 mb-2">
-            <SectionHead eyebrow="SHORT FORM" title="Clips" onSeeAll={() => setActiveTab("clips")} />
-            <div className="overflow-x-auto scrollbar-hide">
-              <div className="flex gap-3 px-4">
-                {clips.slice(0, 10).map((v: Video) => (
-                  <div key={v.id} onClick={() => navigate(`/watch/${v.slug || v.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 120 }}>
-                    <div className="relative overflow-hidden" style={{ aspectRatio: '9/16', clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)' }}>
-                      {getThumbnailUrl(v.thumbnail_url, v.mux_playback_id, v.mux_duration) ? (
-                        <img src={getThumbnailUrl(v.thumbnail_url, v.mux_playback_id, v.mux_duration)!} alt={v.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-zinc-900" />
-                      )}
-                      {v.is_free && (
-                        <span className="absolute top-2 left-2 px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span>
-                      )}
-                    </div>
-                    <p className="text-[12px] font-semibold mt-1.5 truncate" style={{ color: 'rgba(255,255,255,0.85)' }}>{v.title}</p>
-                  </div>
+          <div className={activeTab === "all" ? "mt-7 mb-2" : ""}>
+            {activeTab === "all" && <SectionHead eyebrow="SHORT FORM" title="Clips" onSeeAll={() => setActiveTab("clips")} />}
+            {activeTab === "clips" ? (
+              <GridView>
+                {clips.map((v: Video) => (
+                  <GridCard
+                    key={v.id}
+                    image={v.thumbnail_url}
+                    muxPlaybackId={v.mux_playback_id}
+                    muxDuration={v.mux_duration}
+                    title={v.title}
+                    onClick={() => navigate(`/watch/${v.slug || v.id}`)}
+                    badge={v.is_free ? <span className="px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span> : undefined}
+                  />
                 ))}
+              </GridView>
+            ) : (
+              <div className="overflow-x-auto scrollbar-hide">
+                <div className="flex gap-3 px-4">
+                  {clips.slice(0, 10).map((v: Video) => (
+                    <div key={v.id} onClick={() => navigate(`/watch/${v.slug || v.id}`)} className="flex-shrink-0 cursor-pointer" style={{ width: 120 }}>
+                      <div className="relative overflow-hidden" style={{ aspectRatio: '9/16', clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)' }}>
+                        {getThumbnailUrl(v.thumbnail_url, v.mux_playback_id, v.mux_duration) ? (
+                          <img src={getThumbnailUrl(v.thumbnail_url, v.mux_playback_id, v.mux_duration)!} alt={v.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-zinc-900" />
+                        )}
+                        {v.is_free && (
+                          <span className="absolute top-2 left-2 px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest bg-emerald-500 text-black">FREE</span>
+                        )}
+                      </div>
+                      <p className="text-[12px] font-semibold mt-1.5 truncate" style={{ color: 'rgba(255,255,255,0.85)' }}>{v.title}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
