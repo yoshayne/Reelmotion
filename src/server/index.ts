@@ -28,13 +28,19 @@ const KNOWN_PUBLIC_HOSTS = ["image.mux.com", "stream.mux.com", "cdn.", "cloudina
 
 function proxyImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
-  if (!url.startsWith("http")) return url; // already a relative path
+  if (!url.startsWith("http")) {
+    // Already a relative proxy path — ensure version param is present
+    if (url.startsWith("/api/images/") && !url.includes("X-Amz-")) {
+      return url.includes("?") ? url : `${url}?v=${STORAGE_VERSION}`;
+    }
+    return url;
+  }
   if (url.startsWith("/api/images/")) return url;
   // Don't proxy known public CDNs
   if (KNOWN_PUBLIC_HOSTS.some(h => url.includes(h))) return url;
   // Any other http URL — assume it's a private S3 bucket URL, extract key and proxy
   const match = url.match(STORAGE_URL_PATTERN);
-  if (match) return `/api/images/${encodeURIComponent(match[1])}`;
+  if (match) return `/api/images/${encodeURIComponent(match[1])}?v=${STORAGE_VERSION}`;
   return url;
 }
 
@@ -51,7 +57,7 @@ function proxyImages<T extends Record<string, unknown>>(row: T, fields: string[]
 import * as email from "./email.js";
 import Stripe from "stripe";
 import { stripe, createCheckoutSession, createPortalSession } from "./stripe.js";
-import { uploadFile, getPublicUrl, getSignedDownloadUrl, listFiles } from "./storage.js";
+import { uploadFile, getPublicUrl, getSignedDownloadUrl, listFiles, logStorageError, STORAGE_VERSION } from "./storage.js";
 import { getCached, invalidateCache, redis } from "./redis.js";
 import { runMigrations } from "./migrate.js";
 import cron from "node-cron";
@@ -696,12 +702,9 @@ app.get("/api/promo-popup", async (c) => {
     );
     const row = result.rows[0];
     if (!row) return null;
+    // Use proxy path instead of a signed URL so the link never expires in cache
     if (row.image_key) {
-      try {
-        row.image_url = await getSignedDownloadUrl(row.image_key, 3600);
-      } catch {
-        row.image_url = null;
-      }
+      row.image_url = `/api/images/${encodeURIComponent(row.image_key)}?v=${STORAGE_VERSION}`;
     }
     return row;
   });
@@ -710,12 +713,27 @@ app.get("/api/promo-popup", async (c) => {
 
 app.get("/api/images/*", async (c) => {
   const raw = c.req.path.slice("/api/images/".length);
-  if (!raw) return c.json({ error: "No key" }, 400);
+  if (!raw) {
+    c.header("Cache-Control", "no-store");
+    return c.json({ error: "No key" }, 400);
+  }
   const key = decodeURIComponent(raw);
   try {
     const url = await getSignedDownloadUrl(key);
+    // Allow the browser to cache this redirect slightly under the signed URL's 1-hour TTL
+    c.header("Cache-Control", "private, max-age=3300");
+    // Range requests: the client follows the redirect and sends Range directly to storage,
+    // which supports it natively. Signal that to clients.
+    c.header("Accept-Ranges", "bytes");
     return c.redirect(url, 302);
-  } catch {
+  } catch (err) {
+    logStorageError(err);
+    c.header("Cache-Control", "no-store");
+    const e = err as Record<string, unknown>;
+    const status = (e?.$metadata as Record<string, unknown>)?.httpStatusCode ?? (e?.statusCode);
+    if (status === 403 || (e?.name as string) === "AccessDenied") {
+      return c.json({ error: "Storage credentials error" }, 502);
+    }
     return c.json({ error: "Not found" }, 404);
   }
 });
@@ -728,14 +746,14 @@ app.get("/api/brand-assets/public", async (c) => {
   try {
     const storageFiles = await listFiles("brand/");
     for (const f of storageFiles) {
-      if (f.name) assets[f.name] = `/api/images/${f.key}`;
+      if (f.name) assets[f.name] = `/api/images/${f.key}?v=${STORAGE_VERSION}`;
     }
   } catch { /* storage unavailable — continue */ }
 
   // DB records override storage so renamed assets take precedence
   const result = await query("SELECT name, file_key FROM brand_assets ORDER BY created_at ASC");
   for (const row of result.rows) {
-    assets[row.name] = `/api/images/${row.file_key}`;
+    assets[row.name] = `/api/images/${row.file_key}?v=${STORAGE_VERSION}`;
   }
 
   return c.json(assets);

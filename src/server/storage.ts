@@ -33,6 +33,13 @@ const BUCKET =
   process.env.AWS_BUCKET_NAME ||
   "";
 
+// Set to "false" to switch to virtual-hosted-style (e.g. bucket.endpoint.com/key)
+const FORCE_PATH_STYLE = process.env.BUCKET_FORCE_PATH_STYLE !== "false";
+
+// Bump this (or set STORAGE_VERSION env var) whenever credentials rotate or keys move.
+// Appended as ?v=N to every /api/images/ proxy URL so stale browser-cached 302s are busted.
+export const STORAGE_VERSION = process.env.STORAGE_VERSION || "1";
+
 const s3 = new S3Client({
   endpoint: ENDPOINT,
   region: REGION,
@@ -40,8 +47,27 @@ const s3 = new S3Client({
     accessKeyId: ACCESS_KEY,
     secretAccessKey: SECRET_KEY,
   },
-  forcePathStyle: true,
+  forcePathStyle: FORCE_PATH_STYLE,
 });
+
+// Rate-limit storage error logs to once per minute so a mass failure doesn't flood logs.
+// Logs the error NAME and HTTP status only — never credential values.
+let _lastStorageErrorLog = 0;
+export function logStorageError(err: unknown): void {
+  const now = Date.now();
+  if (now - _lastStorageErrorLog < 60_000) return;
+  _lastStorageErrorLog = now;
+  const e = err as Record<string, unknown>;
+  const name = (e?.name as string) || "UnknownError";
+  const status = (e?.$metadata as Record<string, unknown>)?.httpStatusCode ?? (e?.statusCode) ?? "?";
+  if (status === 403 || name === "AccessDenied" || name === "InvalidAccessKeyId" || name === "SignatureDoesNotMatch") {
+    console.error(`[storage] credentials rejected — ${name} ${status}. Check AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY in Railway.`);
+  } else if (name === "NoSuchKey" || status === 404) {
+    console.error(`[storage] key not found — ${name} ${status}.`);
+  } else {
+    console.error(`[storage] error — ${name} ${status}. Check ENDPOINT/BUCKET env vars.`);
+  }
+}
 
 export async function uploadFile(
   buffer: Buffer,

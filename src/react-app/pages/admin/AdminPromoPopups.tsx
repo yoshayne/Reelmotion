@@ -4,6 +4,7 @@ import { useAdminRole } from "@/react-app/hooks/useAdminRole";
 import { apiFetch, apiFetchForm } from "@/react-app/utils/api";
 import type { PromoPopup } from "@/shared/types";
 import { Plus, Trash2, Eye, EyeOff, ImageIcon, Pencil, X, Check } from "lucide-react";
+import SharedImage from "@/react-app/components/SharedImage";
 
 interface VideoOption { id: number; title: string; }
 interface SeriesOption { id: number; title: string; }
@@ -365,7 +366,7 @@ export default function AdminPromoPopups() {
                 <div className="flex gap-3 p-3 items-center">
                   <div className="w-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-800" style={{ aspectRatio: "16/9" }}>
                     {popup.image_key ? (
-                      <img src={`/api/images/${encodeURIComponent(popup.image_key)}`} alt={popup.title} className="w-full h-full object-cover" />
+                      <SharedImage src={`/api/images/${encodeURIComponent(popup.image_key)}`} alt={popup.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <ImageIcon className="w-5 h-5 text-gray-600" />
