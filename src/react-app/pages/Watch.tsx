@@ -31,7 +31,7 @@ function relativeTime(dateStr: string): string {
 
 function CommentSection({ videoId, isAdmin, canComment }: { videoId: number; isAdmin: boolean; canComment: boolean }) {
   const { isLoaded } = useUser();
-  const { isSignedIn: effectiveSignedIn } = useEffectiveAuth();
+  const { isSignedIn: effectiveSignedIn, isNativeApp } = useEffectiveAuth();
   const { openSignIn } = useClerk();
   const [comments, setComments] = useState<Comment[]>([]);
   const [body, setBody] = useState("");
