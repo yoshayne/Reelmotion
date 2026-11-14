@@ -57,6 +57,7 @@ function proxyImages<T extends Record<string, unknown>>(row: T, fields: string[]
 import * as email from "./email.js";
 import Stripe from "stripe";
 import { stripe, createCheckoutSession, createPortalSession } from "./stripe.js";
+import { subscriptionGrantsAccess, userHasAccess, getOptionalUser } from "./access.js";
 import { uploadFile, getPublicUrl, getSignedDownloadUrl, listFiles, logStorageError, STORAGE_VERSION } from "./storage.js";
 import { getCached, invalidateCache, redis } from "./redis.js";
 import { runMigrations } from "./migrate.js";
@@ -263,6 +264,13 @@ app.post("/api/billing/stripe-webhook", async (c) => {
     return c.json({ error: "Invalid signature" }, 400);
   }
 
+  // Stripe retries deliveries; skip events we've already processed.
+  const firstDelivery = await query(
+    "INSERT INTO stripe_events (id, type) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING RETURNING id",
+    [event.id, event.type]
+  );
+  if (firstDelivery.rows.length === 0) return c.json({ received: true, duplicate: true });
+
   try {
     switch (event.type) {
       case "checkout.session.completed": {
@@ -345,28 +353,38 @@ app.post("/api/billing/stripe-webhook", async (c) => {
         const periodStart = new Date(sub.current_period_start * 1000);
         const periodEnd = new Date(sub.current_period_end * 1000);
 
-        await query(
-          `INSERT INTO subscriptions (user_id, plan, status, stripe_customer_id, stripe_subscription_id, stripe_price_id, period_start_date, period_end_date)
-           VALUES ($1, $2, 'active', $3, $4, $5, $6, $7)
-           ON CONFLICT (user_id) DO UPDATE SET
-             plan = $2, status = 'active', stripe_customer_id = $3,
-             stripe_subscription_id = $4, stripe_price_id = $5,
-             period_start_date = $6, period_end_date = $7, updated_at = NOW()`,
-          [
-            userId,
-            plan,
-            session.customer,
-            session.subscription,
-            priceId,
-            periodStart.toISOString().split("T")[0],
-            periodEnd.toISOString().split("T")[0],
-          ]
+        // Update-then-insert: subscriptions.user_id has no unique constraint, so ON CONFLICT (user_id) can't be used.
+        const subParams = [
+          userId,
+          plan,
+          sub.status,
+          session.customer,
+          session.subscription,
+          priceId,
+          periodStart.toISOString().split("T")[0],
+          periodEnd.toISOString().split("T")[0],
+        ];
+        const updated = await query(
+          `UPDATE subscriptions SET
+             plan = $2, status = $3, stripe_customer_id = $4,
+             stripe_subscription_id = $5, stripe_price_id = $6,
+             period_start_date = $7, period_end_date = $8, updated_at = NOW()
+           WHERE id = (SELECT id FROM subscriptions WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 1)
+           RETURNING id`,
+          subParams
         );
+        if (updated.rows.length === 0) {
+          await query(
+            `INSERT INTO subscriptions (user_id, plan, status, stripe_customer_id, stripe_subscription_id, stripe_price_id, period_start_date, period_end_date)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            subParams
+          );
+        }
 
         await query(
           `UPDATE subscription_attempts SET status = 'completed', completed_at = NOW()
            WHERE stripe_session_id = $1`,
-          [session as unknown as { id: string } ? (session as unknown as { id: string }).id : null]
+          [session.id]
         );
 
         await invalidateCache(`subscription:${userId}`);
@@ -395,9 +413,8 @@ app.post("/api/billing/stripe-webhook", async (c) => {
         const priceId = sub.items.data[0]?.price.id;
         const plan =
           priceId === process.env.STRIPE_MONTHLY_PRICE_ID ? "monthly" : "yearly";
-        const status = ["active", "trialing", "past_due", "canceled"].includes(sub.status)
-          ? sub.status
-          : "active";
+        // Store Stripe's real status; access is decided by subscriptionGrantsAccess().
+        const status = sub.status;
         const periodStart = new Date(sub.current_period_start * 1000);
         const periodEnd = new Date(sub.current_period_end * 1000);
 
@@ -511,6 +528,9 @@ app.post("/api/billing/stripe-webhook", async (c) => {
     }
   } catch (err) {
     console.error("Stripe webhook handler error:", err);
+    // Forget the event and fail so Stripe retries the delivery.
+    await query("DELETE FROM stripe_events WHERE id = $1", [event.id]).catch(() => {});
+    return c.json({ error: "Webhook handler failed" }, 500);
   }
 
   return c.json({ received: true });
@@ -665,6 +685,13 @@ app.get("/api/watch/:id", async (c) => {
   if (!videoResult.rows.length) return c.json({ error: "Not found" }, 404);
   const video = videoResult.rows[0];
 
+  const viewer = await getOptionalUser(c);
+  const isStaff = viewer?.role === "admin" || viewer?.role === "creator";
+  if (!video.is_published && !isStaff) return c.json({ error: "Not found" }, 404);
+
+  const canWatch = video.is_free || (await userHasAccess(viewer));
+  if (!canWatch) video.mux_playback_id = null;
+
   let nextEpisode = null;
   if (video.series_id && video.episode_number) {
     const nextResult = await query(
@@ -679,7 +706,7 @@ app.get("/api/watch/:id", async (c) => {
     nextEpisode = nextResult.rows[0] || null;
   }
 
-  return c.json({ video, nextEpisode });
+  return c.json({ video, nextEpisode, can_watch: canWatch });
 });
 
 app.get("/api/public/cover-art", async (c) => {
@@ -2092,15 +2119,8 @@ app.post("/api/videos/:id/comments", clerkAuth, async (c) => {
   if (text.length > 500) return c.json({ error: "Comment cannot exceed 500 characters." }, 400);
   if (containsBlockedContent(text)) return c.json({ error: "Comment contains prohibited content." }, 400);
 
-  // Require active subscription (admins/creators bypass)
-  if (user.role !== "admin" && user.role !== "creator") {
-    const subResult = await query(
-      `SELECT status FROM subscriptions WHERE user_id = $1 AND status = 'active' LIMIT 1`,
-      [user.id]
-    );
-    if (subResult.rows.length === 0) {
-      return c.json({ error: "An active subscription is required to comment." }, 403);
-    }
+  if (!(await userHasAccess(user))) {
+    return c.json({ error: "An active subscription is required to comment." }, 403);
   }
 
   // Rate limit: max 5 comments per user per 60 seconds
@@ -2418,11 +2438,7 @@ app.get("/api/auth/device/verify", async (c) => {
   const subscriptionActive =
     u.role === "admin" ||
     u.role === "creator" ||
-    u.subscription_status === "active" ||
-    u.subscription_status === "trialing" ||
-    (u.subscription_status === "canceled" &&
-      u.period_end_date != null &&
-      new Date(u.period_end_date) > new Date());
+    subscriptionGrantsAccess({ status: u.subscription_status, period_end_date: u.period_end_date });
 
   return c.json({
     user: {

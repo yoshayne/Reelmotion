@@ -4,9 +4,8 @@ import { useUser, useClerk } from "@clerk/clerk-react";
 import { useEffectiveAuth } from "@/react-app/hooks/useEffectiveAuth";
 import MuxPlayerWrapper from "@/react-app/components/MuxPlayerWrapper";
 import { apiFetch } from "@/react-app/utils/api";
-import { hasAccess } from "@/react-app/utils/access";
 import { useBrandAssets } from "@/react-app/hooks/useBrandAssets";
-import type { Video, Subscription } from "@/shared/types";
+import type { Video } from "@/shared/types";
 import { Bookmark, BookmarkCheck, ChevronRight, Lock, Play, ArrowLeft, Trash2, Share2 } from "lucide-react";
 
 interface Comment {
@@ -199,16 +198,16 @@ function CommentSection({ videoId, isAdmin, canComment }: { videoId: number; isA
 interface WatchData {
   video: Video;
   nextEpisode: Video | null;
+  can_watch: boolean;
 }
 
 export default function WatchPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isLoaded } = useUser();
-  const { isSignedIn, isNativeApp } = useEffectiveAuth();
+  const { isSignedIn, isNativeApp, isLoaded: authLoaded } = useEffectiveAuth();
   const { tagline } = useBrandAssets();
   const [watchData, setWatchData] = useState<WatchData | null>(null);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [inWatchlist, setInWatchlist] = useState(false);
   const [copied, setCopied] = useState(false);
   const [startTime, setStartTime] = useState(0);
@@ -226,8 +225,11 @@ export default function WatchPage() {
   }, [isLoaded, isSignedIn, navigate]);
 
   useEffect(() => {
-    if (!id) return;
-    fetch(`/api/watch/${id}`)
+    if (!id || !authLoaded) return;
+    setLoading(true);
+    setError(null);
+    // Authenticated so the server can decide access and return the playback ID.
+    apiFetch(`/api/watch/${id}`)
       .then((r) => {
         if (!r.ok) throw new Error("Not found");
         return r.json() as Promise<WatchData>;
@@ -235,20 +237,17 @@ export default function WatchPage() {
       .then(setWatchData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, authLoaded, isSignedIn]);
 
   useEffect(() => {
     // Reset user-specific state whenever user identity changes
-    setSubscription(null);
     setInWatchlist(false);
     setStartTime(0);
     if (!isLoaded || (!user && !(window as any).__NATIVE_CLERK_TOKEN__) || !watchData) return;
     Promise.all([
-      apiFetch("/api/billing/subscription").then((r) => r.json() as Promise<Subscription | null>),
       apiFetch("/api/watchlist").then((r) => r.json() as Promise<Video[]>).catch(() => []),
       apiFetch("/api/playback-history").then((r) => r.json() as Promise<Array<{ video_id: number; last_position_seconds: number }>>).catch(() => []),
-    ]).then(([sub, wl, history]) => {
-      setSubscription(sub);
+    ]).then(([wl, history]) => {
       setInWatchlist(Array.isArray(wl) && wl.some((v) => v.id === watchData.video.id));
       const pos = Array.isArray(history) && history.find((h) => h.video_id === watchData.video.id);
       if (pos && pos.last_position_seconds > 5) setStartTime(pos.last_position_seconds);
@@ -327,8 +326,7 @@ export default function WatchPage() {
   }
 
   const { video, nextEpisode } = watchData;
-  const userHasAccess = hasAccess(subscription);
-  const canWatch = userHasAccess || video.is_free;
+  const canWatch = watchData.can_watch;
   const isFutureRelease = !!(video.release_date && new Date(video.release_date) > new Date());
 
   return (

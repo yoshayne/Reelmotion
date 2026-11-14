@@ -530,5 +530,14 @@ export async function runMigrations() {
     END $$;
   `);
 
+  // Processed Stripe webhook event IDs, so retried deliveries aren't applied twice.
+  await query(`
+    CREATE TABLE IF NOT EXISTS stripe_events (
+      id TEXT PRIMARY KEY,
+      type TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
   console.log("DB migrations complete.");
 }

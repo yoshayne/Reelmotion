@@ -2,12 +2,24 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Platform, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, Platform, StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
 
 WebBrowser.maybeCompleteAuthSession();
 
 const APP_URL = "https://reelmotionapp.com";
+
+// Only our own HTTPS pages may be opened externally via the OPEN_URL bridge.
+const EXTERNAL_URL_HOSTS = ["reelmotionapp.com", "www.reelmotionapp.com"];
+
+// Regex instead of URL(): React Native's URL polyfill doesn't implement hostname.
+function isAllowedExternalUrl(raw: string): boolean {
+  const match = /^https:\/\/([^/?#:@]+)(?:[/?#]|$)/i.exec(raw);
+  return !!match && EXTERNAL_URL_HOSTS.includes(match[1].toLowerCase());
+}
+
+// Clerk session tokens expire after ~60s; refresh the copy inside the WebView before that.
+const TOKEN_REFRESH_MS = 45_000;
 
 const CHROME_UA =
   Platform.OS === "android"
@@ -30,7 +42,33 @@ export default function App() {
   const ssoRunning = useRef(false);
   const pendingTokenRef = useRef<{ token: string; userInfo: Record<string, string> } | null>(null);
 
-  const addLog = (msg: string) => console.log(`[RM] ${msg}`);
+  const addLog = (msg: string) => {
+    if (__DEV__) console.log(`[RM] ${msg}`);
+  };
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+    const refreshToken = async () => {
+      try {
+        const token = await getToken();
+        if (!token || !webViewRef.current) return;
+        webViewRef.current.injectJavaScript(`
+          window.__NATIVE_CLERK_TOKEN__ = ${JSON.stringify(token)};
+          true;
+        `);
+      } catch (e: any) {
+        addLog(`token refresh failed: ${e?.message ?? e}`);
+      }
+    };
+    const interval = setInterval(refreshToken, TOKEN_REFRESH_MS);
+    const appStateSub = AppState.addEventListener("change", (state) => {
+      if (state === "active") refreshToken();
+    });
+    return () => {
+      clearInterval(interval);
+      appStateSub.remove();
+    };
+  }, [isSignedIn]);
 
   useEffect(() => {
     addLog(`Auth: isLoaded=${isLoaded} isSignedIn=${isSignedIn} userId=${user?.id ?? "none"}`);
@@ -153,8 +191,11 @@ export default function App() {
         addLog("Website requested native Google sign-in");
         handleNativeSSO();
       } else if (data.type === "OPEN_URL" && typeof data.url === "string") {
-        addLog(`Opening external URL: ${data.url}`);
-        Linking.openURL(data.url);
+        if (isAllowedExternalUrl(data.url)) {
+          Linking.openURL(data.url);
+        } else {
+          addLog(`Blocked OPEN_URL for disallowed URL: ${data.url}`);
+        }
       }
     } catch {
       addLog(`WebView→Native (raw): ${event.nativeEvent.data}`);
