@@ -8,7 +8,7 @@ import { Check, Film, Users, Zap, Heart, Crown } from "lucide-react";
 
 export default function SubscribePage() {
   const { user: clerkUser, isLoaded } = useUser();
-  const { nativeUser } = useNativeSession();
+  const { nativeUser, isNativeApp } = useNativeSession();
   const user = clerkUser ?? (nativeUser ? { id: nativeUser.id } : null);
   const { logo, tagline } = useBrandAssets();
   const navigate = useNavigate();
@@ -43,6 +43,31 @@ export default function SubscribePage() {
     { icon: Users, text: "Filmmaker Q&As and community events" },
     { icon: Heart, text: "Support independent film culture" },
   ];
+
+  if (isNativeApp) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center px-6 text-center gap-6">
+        <div>
+          {logo ? (
+            <img src={logo} alt="ReelMotion" className="h-8 w-auto mx-auto mb-6" />
+          ) : (
+            <span className="text-white font-black text-xl tracking-tight block mb-6">REEL<span style={{ color: '#E8001D' }}>MOTION</span></span>
+          )}
+          <Crown className="w-10 h-10 mx-auto mb-4" style={{ color: '#E8001D' }} />
+          <h1 className="text-2xl font-black mb-2" style={{ letterSpacing: '-0.03em' }}>Subscribe on the Web</h1>
+          <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+            Memberships are managed at our website. Open your browser and visit:
+          </p>
+          <div className="rounded-xl px-5 py-4 mb-2" style={{ backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <p className="font-black text-base tracking-wide" style={{ color: '#E8001D' }}>reelmotionapp.com/subscribe</p>
+          </div>
+          <p className="text-xs mt-4" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            After subscribing, sign in here and your membership will be active immediately.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">

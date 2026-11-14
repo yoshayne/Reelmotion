@@ -105,13 +105,22 @@ function CommentSection({ videoId, isAdmin, canComment }: { videoId: number; isA
               <Lock className="w-7 h-7" style={{ color: '#E8001D' }} />
             </div>
             <p className="font-black text-base">Members Only</p>
-            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>Subscribe to join the conversation.</p>
-            <Link
-              to="/subscribe"
-              style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '10px 22px', display: 'inline-block', marginTop: 4 }}
-            >
-              <span className="font-extrabold text-sm tracking-[0.08em] uppercase" style={{ transform: 'skewX(6deg)', display: 'block' }}>Join the Community</span>
-            </Link>
+            {isNativeApp ? (
+              <>
+                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>Subscribe at reelmotionapp.com to join the conversation.</p>
+                <p className="text-sm font-black mt-1" style={{ color: '#E8001D' }}>reelmotionapp.com/subscribe</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>Subscribe to join the conversation.</p>
+                <Link
+                  to="/subscribe"
+                  style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '10px 22px', display: 'inline-block', marginTop: 4 }}
+                >
+                  <span className="font-extrabold text-sm tracking-[0.08em] uppercase" style={{ transform: 'skewX(6deg)', display: 'block' }}>Join the Community</span>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       ) : (
@@ -191,7 +200,7 @@ export default function WatchPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isLoaded } = useUser();
-  const { isSignedIn } = useEffectiveAuth();
+  const { isSignedIn, isNativeApp } = useEffectiveAuth();
   const { tagline } = useBrandAssets();
   const [watchData, setWatchData] = useState<WatchData | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -376,11 +385,18 @@ export default function WatchPage() {
                 <p className="text-sm max-w-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
                   Join the ReelMotion community to watch this film.
                 </p>
-                <Link to="/subscribe">
-                  <div style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '12px 24px', display: 'inline-block' }}>
-                    <span className="font-extrabold text-sm tracking-[0.08em] uppercase" style={{ transform: 'skewX(6deg)', display: 'block' }}>Join the Community</span>
+                {isNativeApp ? (
+                  <div className="text-center">
+                    <p className="text-sm mb-1" style={{ color: 'rgba(255,255,255,0.45)' }}>Subscribe at our website:</p>
+                    <p className="font-black text-base" style={{ color: '#E8001D' }}>reelmotionapp.com/subscribe</p>
                   </div>
-                </Link>
+                ) : (
+                  <Link to="/subscribe">
+                    <div style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '12px 24px', display: 'inline-block' }}>
+                      <span className="font-extrabold text-sm tracking-[0.08em] uppercase" style={{ transform: 'skewX(6deg)', display: 'block' }}>Join the Community</span>
+                    </div>
+                  </Link>
+                )}
               </div>
             </div>
           )}
