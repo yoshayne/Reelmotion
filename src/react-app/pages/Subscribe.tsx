@@ -44,25 +44,41 @@ export default function SubscribePage() {
     { icon: Heart, text: "Support independent film culture" },
   ];
 
+  const openSubscribeInBrowser = () => {
+    const url = "https://reelmotionapp.com/subscribe";
+    if ((window as any).ReactNativeWebView) {
+      (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: "OPEN_URL", url }));
+    } else {
+      window.open(url, "_blank");
+    }
+  };
+
   if (isNativeApp) {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center px-6 text-center gap-6">
-        <div>
+        <div className="w-full max-w-sm">
           {logo ? (
-            <img src={logo} alt="ReelMotion" className="h-8 w-auto mx-auto mb-6" />
+            <img src={logo} alt="ReelMotion" className="h-8 w-auto mx-auto mb-8" />
           ) : (
-            <span className="text-white font-black text-xl tracking-tight block mb-6">REEL<span style={{ color: '#E8001D' }}>MOTION</span></span>
+            <span className="text-white font-black text-xl tracking-tight block mb-8">REEL<span style={{ color: '#E8001D' }}>MOTION</span></span>
           )}
-          <Crown className="w-10 h-10 mx-auto mb-4" style={{ color: '#E8001D' }} />
-          <h1 className="text-2xl font-black mb-2" style={{ letterSpacing: '-0.03em' }}>Subscribe on the Web</h1>
-          <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
-            Memberships are managed at our website. Open your browser and visit:
+          <Crown className="w-12 h-12 mx-auto mb-5" style={{ color: '#E8001D' }} />
+          <h1 className="text-2xl font-black mb-3" style={{ letterSpacing: '-0.03em' }}>Join the Community</h1>
+          <p className="text-sm mb-8" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+            Memberships are managed on our website. Tap below to subscribe — it only takes a minute.
           </p>
-          <div className="rounded-xl px-5 py-4 mb-2" style={{ backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <p className="font-black text-base tracking-wide" style={{ color: '#E8001D' }}>reelmotionapp.com/subscribe</p>
-          </div>
-          <p className="text-xs mt-4" style={{ color: 'rgba(255,255,255,0.3)' }}>
-            After subscribing, sign in here and your membership will be active immediately.
+          <button
+            onClick={openSubscribeInBrowser}
+            className="w-full flex items-center justify-center gap-3 py-4 font-black text-base tracking-wide mb-4"
+            style={{ backgroundColor: '#E8001D', transform: 'skewX(-4deg)' }}
+          >
+            <span style={{ transform: 'skewX(4deg)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Crown className="w-5 h-5" />
+              Subscribe on the Web
+            </span>
+          </button>
+          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            After subscribing, sign in here and your membership activates immediately.
           </p>
         </div>
       </div>

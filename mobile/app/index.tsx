@@ -152,6 +152,9 @@ export default function App() {
       if (data.type === "GOOGLE_SIGN_IN") {
         addLog("Website requested native Google sign-in");
         handleNativeSSO();
+      } else if (data.type === "OPEN_URL" && typeof data.url === "string") {
+        addLog(`Opening external URL: ${data.url}`);
+        Linking.openURL(data.url);
       }
     } catch {
       addLog(`WebView→Native (raw): ${event.nativeEvent.data}`);

@@ -107,8 +107,13 @@ function CommentSection({ videoId, isAdmin, canComment }: { videoId: number; isA
             <p className="font-black text-base">Members Only</p>
             {isNativeApp ? (
               <>
-                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>Subscribe at reelmotionapp.com to join the conversation.</p>
-                <p className="text-sm font-black mt-1" style={{ color: '#E8001D' }}>reelmotionapp.com/subscribe</p>
+                <p className="text-sm mb-2" style={{ color: 'rgba(255,255,255,0.45)' }}>Subscribe to join the conversation.</p>
+                <button
+                  onClick={() => { const url = "https://reelmotionapp.com/subscribe"; (window as any).ReactNativeWebView?.postMessage(JSON.stringify({ type: "OPEN_URL", url })); }}
+                  style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '10px 22px', display: 'inline-block', border: 'none', cursor: 'pointer' }}
+                >
+                  <span className="font-extrabold text-sm tracking-[0.08em] uppercase text-white" style={{ transform: 'skewX(6deg)', display: 'block' }}>Subscribe on the Web</span>
+                </button>
               </>
             ) : (
               <>
@@ -386,10 +391,12 @@ export default function WatchPage() {
                   Join the ReelMotion community to watch this film.
                 </p>
                 {isNativeApp ? (
-                  <div className="text-center">
-                    <p className="text-sm mb-1" style={{ color: 'rgba(255,255,255,0.45)' }}>Subscribe at our website:</p>
-                    <p className="font-black text-base" style={{ color: '#E8001D' }}>reelmotionapp.com/subscribe</p>
-                  </div>
+                  <button
+                    onClick={() => { const url = "https://reelmotionapp.com/subscribe"; (window as any).ReactNativeWebView?.postMessage(JSON.stringify({ type: "OPEN_URL", url })); }}
+                    style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '12px 24px', display: 'inline-block', border: 'none', cursor: 'pointer' }}
+                  >
+                    <span className="font-extrabold text-sm tracking-[0.08em] uppercase text-white" style={{ transform: 'skewX(6deg)', display: 'block' }}>Subscribe on the Web</span>
+                  </button>
                 ) : (
                   <Link to="/subscribe">
                     <div style={{ transform: 'skewX(-6deg)', backgroundColor: '#E8001D', padding: '12px 24px', display: 'inline-block' }}>
